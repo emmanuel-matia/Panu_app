@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
             launch { container.panuFeaturesService.syncPendingOfflineCreations() }
         }
 
-        // Synchronisation automatique dès le retour du réseau (Mode Hors-ligne Style CapCut / PWA)
+        // Synchronisation automatique dès le retour du réseau (Mode Hors-ligne PANU)
         try {
             val connectivityManager = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
             connectivityManager?.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
@@ -263,6 +263,7 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 HomeScreen(
                     postRepository = container.postRepository,
                     featuresService = container.panuFeaturesService,
+                    geminiRepository = container.geminiRepository,
                     isLoggedIn = isUserLoggedIn,
                     isFounder = isFounder,
                     onNavigate = { route ->
@@ -345,7 +346,7 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 )
             }
 
-            // 🎨 Studio Graphique (Canva) & Studio Vidéo IA (CapCut / Pixverse)
+            // 🎬 Studio PANU (Vidéo IA, Templates & Création Graphique)
             composable(PanuScreen.Studio.route) {
                 StudioScreen(
                     mediaService = container.creativeMediaService,
@@ -422,6 +423,7 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                     postRepository = container.postRepository,
                     sessionManager = container.sessionManager,
                     isFounder = isFounder,
+                    featuresService = container.panuFeaturesService,
                     onNavigate = { route ->
                         if (route != PanuScreen.Creations.route) {
                             navController.navigate(route) {
@@ -449,6 +451,7 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                     postRepository = container.postRepository,
                     sessionManager = container.sessionManager,
                     isFounder = isFounder,
+                    featuresService = container.panuFeaturesService,
                     onNavigate = { route ->
                         if (route != PanuScreen.Activity.route) {
                             navController.navigate(route) {

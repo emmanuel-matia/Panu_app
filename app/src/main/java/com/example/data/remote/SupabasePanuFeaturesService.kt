@@ -16,6 +16,9 @@ import com.example.data.model.LiveGiftTransaction
 import com.example.data.model.MemberCardVerification
 import com.example.data.model.MonetizedAdSequence
 import com.example.data.model.PanuNotification
+import com.example.data.model.PanuTemplate
+import com.example.data.model.PanuTemplateField
+import com.example.data.model.PanuTemplateScene
 import com.example.data.model.PaymentProvider
 import com.example.data.model.ViralVideoTemplate
 import com.example.data.model.VisibilityBoostPlan
@@ -31,7 +34,7 @@ import java.util.UUID
 
 class SupabasePanuFeaturesService(
     private val client: SupabaseClient,
-    private val sessionManager: SessionManager,
+    val sessionManager: SessionManager,
     private val appContext: Context
 ) {
     // =========================================================================
@@ -67,13 +70,13 @@ class SupabasePanuFeaturesService(
     private val _boostedVideoIds = MutableStateFlow<Set<String>>(setOf("panu_viral_01"))
     val boostedVideoIds: StateFlow<Set<String>> = _boostedVideoIds.asStateFlow()
 
-    // Mode Hors-ligne CapCut / PWA : Cache local des projets et file de synchronisation automatique
+    // Mode Hors-ligne PANU : Cache local des projets et synchronisation automatique
     private val offlinePrefs = appContext.getSharedPreferences("panu_offline_studio_cache", Context.MODE_PRIVATE)
     private val _pendingOfflineSyncCount = MutableStateFlow(0)
     val pendingOfflineSyncCount: StateFlow<Int> = _pendingOfflineSyncCount.asStateFlow()
 
-    private val _isOfflineCapCutModeActive = MutableStateFlow(true)
-    val isOfflineCapCutModeActive: StateFlow<Boolean> = _isOfflineCapCutModeActive.asStateFlow()
+    private val _isOfflineStudioModeActive = MutableStateFlow(true)
+    val isOfflineStudioModeActive: StateFlow<Boolean> = _isOfflineStudioModeActive.asStateFlow()
 
     fun dismissInAppBanner() {
         _inAppBannerNotification.value = null
@@ -345,36 +348,12 @@ class SupabasePanuFeaturesService(
     }
 
     // =========================================================================
-    // 2. STUDIO GRAPHIQUE & DESIGN (STYLE CANVA -> TABLE `canvas_projects`)
+    // 2. STUDIO GRAPHIQUE & DESIGN PANU -> TABLE `canvas_projects`
     // =========================================================================
-    private val _savedCanvasProjects = MutableStateFlow<List<CanvasProject>>(
-        listOf(
-            CanvasProject(
-                id = "canvas_preset_afro_01",
-                userId = "public",
-                title = "Affiche Concert Afrobeats Abidjan",
-                backgroundHex = "#1A1423",
-                exportFormat = "PNG",
-                layers = listOf(
-                    CanvasLayer("l1", CanvasLayerType.SHAPE, "Cercle Doré", x = 140f, y = 90f, colorHex = "#E5A93C"),
-                    CanvasLayer("l2", CanvasLayerType.TEXT, "FESTIVAL PANU LIVE", x = 40f, y = 130f, colorHex = "#FFFFFF", fontSizeSp = 26f),
-                    CanvasLayer("l3", CanvasLayerType.STICKER, "🔥👑🎶", x = 110f, y = 210f, fontSizeSp = 34f)
-                )
-            ),
-            CanvasProject(
-                id = "canvas_preset_promo_02",
-                userId = "public",
-                title = "Miniature Virale TikTok & Reels",
-                backgroundHex = "#0F2027",
-                exportFormat = "MP4",
-                layers = listOf(
-                    CanvasLayer("l4", CanvasLayerType.TEXT, "TOP 5 SECRETS IA", x = 50f, y = 110f, colorHex = "#E5A93C", fontSizeSp = 28f),
-                    CanvasLayer("l5", CanvasLayerType.STICKER, "🚀✨🎬", x = 100f, y = 190f, fontSizeSp = 32f)
-                )
-            )
-        )
-    )
+    private val _savedCanvasProjects = MutableStateFlow<List<CanvasProject>>(emptyList())
     val savedCanvasProjects: StateFlow<List<CanvasProject>> = _savedCanvasProjects.asStateFlow()
+
+    suspend fun saveCanvasProject(project: CanvasProject): Result<CanvasProject> = saveCanvasProjectToSupabase(project)
 
     suspend fun saveCanvasProjectToSupabase(project: CanvasProject): Result<CanvasProject> = withContext(Dispatchers.IO) {
         val userId = sessionManager.currentUserId.value ?: "guest"
@@ -409,7 +388,7 @@ class SupabasePanuFeaturesService(
             put("export_format", project.exportFormat)
         }
 
-        // Sauvegarde locale systématique (Mode Hors-ligne Style CapCut / PWA)
+        // Sauvegarde locale systématique (Mode Hors-ligne Studio PANU)
         cacheProjectLocally(payload)
 
         var syncedOnline = false
@@ -427,7 +406,7 @@ class SupabasePanuFeaturesService(
         if (!syncedOnline) {
             enqueueOfflineProjectForAutoSync(payload)
             triggerRealtimeNotification(
-                title = "Sauvegardé en Mode Hors-ligne (CapCut Local) 💾",
+                title = "Sauvegardé en Mode Hors-ligne (PANU Studio Local) 💾",
                 message = "Le projet « ${project.title} » est enregistré localement et sera synchronisé automatiquement dès le retour du réseau.",
                 type = "system"
             )
@@ -573,89 +552,321 @@ class SupabasePanuFeaturesService(
     }
 
     // =========================================================================
-    // 3. STUDIO VIDÉO IA, TEMPLATES SPONSORISÉS MARQUES & PROMPT 8K PRÊT À TESTER
+    // 3. TEMPLATES VIDÉO PANU RÉELS & STRUCTURÉS PAR CATÉGORIES
     // =========================================================================
-    val defaultViralTemplates = listOf(
-        ViralVideoTemplate(
-            id = "tpl_sponsor_brand_3d",
-            title = "Faites apparaître votre produit dans un décor 3D",
-            description = "MODÈLE SPONSORISÉ EN TÊTE DE LISTE : Idéal pour entreprises et marques locales. Sublimer un produit en studio 3D photoréaliste 8K.",
-            category = "Sponsorisé • Marques",
-            stylePreset = "Animation 3D",
-            promptTemplate = "Cinematic 8K product showcase in a luxurious 3D African modern architectural set, golden hour rim lighting, floating golden particles, ultra-detailed textures, smooth orbital camera movement, photorealistic --ar 16:9 --fps 30",
-            previewVideoUrl = "",
-            thumbnailUrl = "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80",
+    val officialPanuTemplates = listOf(
+        PanuTemplate(
+            id = "tpl_panu_entreprise",
+            title = "Publicité Entreprise & Commerce",
+            description = "Spot vidéo dynamique pour valoriser une entreprise, commerce ou marque locale.",
+            category = "💼 Entreprise",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
             durationSeconds = 15,
-            usesCount = 34890,
-            ogTitle = "Produit en Décor 3D Sponsorisé • PANU Studio IA",
-            ogImageUrl = "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80",
-            isSponsoredBrand = true,
-            sponsorBrandName = "Partenariat Entreprises & Marques Locales",
-            sponsorBadgeText = "⭐ SPONSORISÉ • N°1 TENDANCE"
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Accroche Produit & Lieu", 5, "Découvrez l'excellence locale"),
+                PanuTemplateScene(2, "Présentation de l'Offre", 5, "Qualité & Service garanti"),
+                PanuTemplateScene(3, "Contact WhatsApp & Ville", 5, "Commandez dès maintenant")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("company_name", "Nom de l'entreprise", "Ex: Kin Tech SARL"),
+                PanuTemplateField("product_name", "Produit ou service phare", "Ex: Smartphones & Accessoires"),
+                PanuTemplateField("hook_text", "Phrase d'accroche", "Ex: La meilleure qualité à prix imbattable"),
+                PanuTemplateField("whatsapp", "Numéro WhatsApp", "Ex: +243 81 000 0000"),
+                PanuTemplateField("city", "Ville", "Ex: Kinshasa"),
+                PanuTemplateField("language", "Langue", "Français / Lingala"),
+                PanuTemplateField("style", "Style visuel", "Moderne & Lumineux")
+            ),
+            basePrompt = "Spot publicitaire moderne et professionnel mettant en valeur les produits d'une entreprise locale dynamique en Afrique, éclairage studio lumineux, plans serrés 4K, rythme engageant",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Publicité & Commercial"
         ),
-        ViralVideoTemplate(
-            id = "tpl_sponsor_concert_event",
-            title = "Affiche de concert / événement sponsorisée",
-            description = "MODÈLE SPONSORISÉ EN TÊTE DE LISTE : Bande-annonce et affiche animée pour concerts, festivals, spectacles et événements d'entreprise.",
-            category = "Sponsorisé • Événements",
-            stylePreset = "Cinématographique",
-            promptTemplate = "Cinematic 8K concert and festival stage in a vibrant modern African stadium at night, volumetric laser beams, energetic crowd, golden pyrotechnics, dynamic drone camera sweep, shot on 35mm lens, photorealistic --ar 16:9 --fps 30",
-            previewVideoUrl = "",
-            thumbnailUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80",
+        PanuTemplate(
+            id = "tpl_panu_musique",
+            title = "Clip Musical & Ambiance Live",
+            description = "Mise en scène cinématique pour artistes, chanteurs et scènes musicales.",
+            category = "🎵 Musique",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
             durationSeconds = 15,
-            usesCount = 29410,
-            ogTitle = "Affiche de Concert & Événement Sponsorisée • PANU Studio",
-            ogImageUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80",
-            isSponsoredBrand = true,
-            sponsorBrandName = "AfroEvents & Marques Partenaires",
-            sponsorBadgeText = "⭐ SPONSORISÉ • TÊTE DE LISTE"
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Introduction Rythme & Scène", 5, "Ambiance concert & faisceaux lumineux"),
+                PanuTemplateScene(2, "Performance Artiste", 5, "Chorégraphie et énergie de foule"),
+                PanuTemplateScene(3, "Titre du Morceau", 5, "Disponible sur toutes les plateformes")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("artist_name", "Nom de l'artiste", "Ex: Fally Ipupa / Artiste PANU"),
+                PanuTemplateField("song_title", "Titre du morceau", "Ex: Mwinda Live"),
+                PanuTemplateField("genre", "Genre musical", "Afrobeats / Rumba / Gospel"),
+                PanuTemplateField("streaming", "Plateformes", "YouTube, Spotify, Apple Music")
+            ),
+            basePrompt = "Clip musical grand spectacle, artiste charismatique sur une scène moderne avec jeux de lumières chauds et dorés, foule en liesse, caméra fluide cinématique",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Cinématographique"
         ),
-        ViralVideoTemplate(
-            id = "tpl_cinematic_8k_metropolis",
-            title = "Drone 8K Métropole Africaine (Exemple Prêt à Tester)",
-            description = "Prompt officiel photoréaliste 8K : survol en drone d'une métropole africaine moderne au coucher du soleil (Golden Hour, 35mm, 30 FPS).",
-            category = "Documentaire & Cinéma 8K",
-            stylePreset = "Cinématographique",
-            promptTemplate = GeminiRepository.READY_TO_TEST_CINEMATIC_VIDEO_PROMPT,
-            previewVideoUrl = "",
-            thumbnailUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
+        PanuTemplate(
+            id = "tpl_panu_humour",
+            title = "Sketch & Vidéo Humoristique",
+            description = "Format court humoristique avec mise en situation cocasse et chute comique.",
+            category = "😂 Humour",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
+            durationSeconds = 15,
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Situation de départ", 5, "Une journée ordinaire qui dérape"),
+                PanuTemplateScene(2, "Quiproquo comique", 5, "La confusion grandit"),
+                PanuTemplateScene(3, "Chute inattendue", 5, "Réaction hilare")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("sketch_title", "Titre du sketch", "Ex: Quand le virement tarde"),
+                PanuTemplateField("comedian_name", "Créateur / Comédien", "Ex: Junior Le Rieur"),
+                PanuTemplateField("punchline", "Chute humoristique", "Ex: Il a éteint son téléphone !")
+            ),
+            basePrompt = "Scène comique réaliste du quotidien urbain africain, expressions faciales expressives, découpage dynamique, lumière naturelle",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Réaliste & Documentaire"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_eglise",
+            title = "Annonce Événement & Célébration",
+            description = "Annonce solennelle et lumineuse pour cultes, conférences et célébrations.",
+            category = "🙏 Église & événements",
+            formatLabel = "Horizontal (16:9)",
+            aspectRatio = "16:9",
+            durationSeconds = 15,
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Atmosphère & Thème", 5, "Lumière dorée & recueillement"),
+                PanuTemplateScene(2, "Date & Lieu", 5, "Programme des festivités"),
+                PanuTemplateScene(3, "Invitation générale", 5, "Bienvenue à tous")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("event_title", "Nom de l'événement", "Ex: Grande Conférence d'Impact"),
+                PanuTemplateField("church_name", "Organisation / Église", "Ex: Centre d'Évangélisation"),
+                PanuTemplateField("date_location", "Date et lieu", "Ex: Samedi 18h • Salle Polyvalente"),
+                PanuTemplateField("contact", "Contact / Renseignements", "Ex: +243 82 000 0000")
+            ),
+            basePrompt = "Célébration solennelle lumineuse, salle de conférence moderne avec éclairage ambré chaleureux, assemblée attentive, plans larges majestueux",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Cinématographique"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_afrique_rdc",
+            title = "Culture & Fierté Congolaise / RDC",
+            description = "Célébration des paysages, de la culture et de la jeunesse de la RDC et d'Afrique.",
+            category = "🇨🇩 Afrique / RDC",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
+            durationSeconds = 15,
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Patrimoine & Panorama", 5, "Architecture et coucher de soleil"),
+                PanuTemplateScene(2, "Créativité & Talents", 5, "Jeunesse innovante"),
+                PanuTemplateScene(3, "Message d'Espoir", 5, "Fierté continentale")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("theme_title", "Thème", "Ex: Bâtisseurs du Futur"),
+                PanuTemplateField("city", "Ville / Région", "Ex: Kinshasa • Goma • Lubumbashi"),
+                PanuTemplateField("motto", "Slogan ou message", "Ex: L'avenir s'écrit maintenant")
+            ),
+            basePrompt = "Panorama vibrant et moderne d'une ville congolaise à l'heure dorée, fleuve majestueux, créateurs visionnaires travaillant dans des espaces lumineux, plans 35mm cinématographiques",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Cinématographique"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_produit",
+            title = "Vitrine Produit & E-Commerce",
+            description = "Mise en avant esthétique d'un article, vêtement, parfum ou accessoire.",
+            category = "🛍️ Produits & commerces",
+            formatLabel = "Carré (1:1)",
+            aspectRatio = "1:1",
+            durationSeconds = 10,
+            durationLabel = "10\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Zoom Produit & Textures", 5, "Gros plan élégant"),
+                PanuTemplateScene(2, "Offre & Commande", 5, "Prix spécial et contact WhatsApp")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("product_name", "Nom du produit", "Ex: Sac Cuir Artisanal"),
+                PanuTemplateField("price", "Prix", "Ex: 25 $ / 50 000 CDF"),
+                PanuTemplateField("whatsapp", "WhatsApp Commande", "Ex: +243 89 000 0000")
+            ),
+            basePrompt = "Mise en valeur produit haut de gamme en studio, plateau tournant, textures détaillées, éclairage doux trois points, rendu net et photoréaliste",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Publicité & Commercial"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_formation",
+            title = "Micro-Formation & Tuto Express",
+            description = "Capsule éducative claire pour transmettre un savoir ou une méthode étape par étape.",
+            category = "🎓 Formation",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
+            durationSeconds = 15,
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Problème clé", 5, "Pourquoi beaucoup échouent"),
+                PanuTemplateScene(2, "La solution concrète", 5, "Étape 1 et étape 2"),
+                PanuTemplateScene(3, "Résultat final", 5, "Mise en pratique immédiate")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("topic", "Sujet de la formation", "Ex: 3 Secrets pour Vendre en Ligne"),
+                PanuTemplateField("instructor", "Nom du formateur", "Ex: Coach Mike"),
+                PanuTemplateField("key_takeaway", "Conseil clé", "Ex: Soigner l'accroche dès les 3 premières secondes")
+            ),
+            basePrompt = "Capsule éducative moderne dans un studio épuré, infographies claires flottantes, présentateur charismatique et engageant",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Réaliste & Documentaire"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_cinema",
+            title = "Bande-Annonce & Teaser Cinéma",
+            description = "Format cinématique grand spectacle avec tension narrative et typographie élégante.",
+            category = "🎬 Cinéma",
+            formatLabel = "Horizontal (16:9)",
+            aspectRatio = "16:9",
             durationSeconds = 20,
-            usesCount = 42150,
-            ogTitle = "Documentaire 8K Métropole Africaine • PANU Studio IA",
-            ogImageUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
-            isSponsoredBrand = false,
-            sponsorBrandName = "Modèle Officiel PANU 8K",
-            sponsorBadgeText = "🎬 PROMPT 8K OFFICIEL"
+            durationLabel = "20\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Plan d'atmosphère", 7, "Ciel crépusculaire et mystère"),
+                PanuTemplateScene(2, "Climax dramatique", 7, "Face-à-face intense"),
+                PanuTemplateScene(3, "Titre de l'œuvre", 6, "Prochainement sur PANU")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("movie_title", "Titre de l'œuvre", "Ex: Le Destin d'Ewango"),
+                PanuTemplateField("director", "Réalisateur", "Ex: Studio PANU Films"),
+                PanuTemplateField("logline", "Pitch en une phrase", "Ex: Quand le passé ressurgit au cœur de la ville")
+            ),
+            basePrompt = "Bande-annonce cinématographique grand écran, ratio 16:9, étalonnage anamorphique teal and orange, profondeur de champ cinématographique 35mm",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Cinématographique"
         ),
-        ViralVideoTemplate(
-            id = "tpl_pixverse_02",
-            title = "Héros Animation 3D Studio Pixar",
-            description = "Transforme une scène quotidienne en court-métrage d'animation 3D ultra-expressif.",
-            category = "Storytelling IA",
-            stylePreset = "Animation 3D",
-            promptTemplate = "Jeune entrepreneur créatif africain dans son studio lumineux entouré d'hologrammes dorés, style animation 3D Pixar",
-            previewVideoUrl = "",
-            thumbnailUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
+        PanuTemplate(
+            id = "tpl_panu_tiktok_reels",
+            title = "Accroche Virale (Hook 3s)",
+            description = "Format vertical explosif conçu pour retenir l'attention dès la première seconde.",
+            category = "📱 TikTok / Shorts / Reels",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
+            durationSeconds = 10,
+            durationLabel = "10\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Hook visuel", 3, "Arrêtez de scroller !"),
+                PanuTemplateScene(2, "Révélation", 4, "Voici ce que personne ne vous dit"),
+                PanuTemplateScene(3, "Call to action", 3, "Abonne-toi pour la suite")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("hook_question", "Question d'accroche", "Ex: Tu fais encore cette erreur ?"),
+                PanuTemplateField("secret", "La réponse", "Ex: Utilise l'IA de PANU en un clic")
+            ),
+            basePrompt = "Format court vertical ultra-dynamique, cadrage serré expressif, typographie animée moderne, rythme soutenu",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Cinématographique"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_tendances",
+            title = "Tendance Rythme & Énergie",
+            description = "Séquence punchy avec transitions fluides pour surfer sur les tendances.",
+            category = "🔥 Tendances",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
+            durationSeconds = 10,
+            durationLabel = "10\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Transition Énergique", 5, "Beat drop visuel"),
+                PanuTemplateScene(2, "Visuel Punchy", 5, "Style affirmé")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("trend_title", "Titre de la tendance", "Ex: Nouveau Challenge PANU"),
+                PanuTemplateField("caption", "Légende", "Ex: À ton tour d'essayer !")
+            ),
+            basePrompt = "Séquence vidéo dynamique aux couleurs saturées, montage rapide, effets d'énergie et de transition modernes",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Animation 3D"
+        ),
+        PanuTemplate(
+            id = "tpl_panu_publicite",
+            title = "Campagne & Promotion Spéciale",
+            description = "Annonce promotionnelle avec mise en avant d'une offre limitée et réduction.",
+            category = "📢 Publicité",
+            formatLabel = "Vertical (9:16)",
+            aspectRatio = "9:16",
             durationSeconds = 15,
-            usesCount = 12350,
-            ogTitle = "Court-métrage Animation 3D • PANU Studio IA",
-            ogImageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80"
-        ),
-        ViralVideoTemplate(
-            id = "tpl_anime_03",
-            title = "Épopée Anime Guerrier du Sahel",
-            description = "Séquence d'action dynamique avec effets d'énergie néon et découpage manga.",
-            category = "Anime & Action",
-            stylePreset = "Anime",
-            promptTemplate = "Héros charismatique sous un ciel étoilé du Sahel avec aura dorée étincelante, animation japonaise 60fps",
-            previewVideoUrl = "",
-            thumbnailUrl = "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80",
-            durationSeconds = 20,
-            usesCount = 9870,
-            ogTitle = "Épopée Anime • Généré sur PANU Studio",
-            ogImageUrl = "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80"
+            durationLabel = "15\"",
+            scenes = listOf(
+                PanuTemplateScene(1, "Annonce de la Promo", 5, "Offre exceptionnelle cette semaine"),
+                PanuTemplateScene(2, "Détail de l'Offre", 5, "-30% sur tous les services"),
+                PanuTemplateScene(3, "Comment en profiter", 5, "Contactez-nous sur WhatsApp")
+            ),
+            editableFields = listOf(
+                PanuTemplateField("promo_title", "Titre de la promo", "Ex: Grande Braderie du Mois"),
+                PanuTemplateField("discount", "Réduction / Avantage", "Ex: Jusqu'à -40% de remise"),
+                PanuTemplateField("whatsapp", "Numéro WhatsApp", "Ex: +243 85 000 0000")
+            ),
+            basePrompt = "Publicité promotionnelle haute en couleur avec éléments graphiques percutants, ambiance festive et commerciale, 4K net",
+            recommendedEngine = "MiniMax/Hailuo",
+            stylePreset = "Publicité & Commercial"
         )
     )
+
+    // Version rétro-compatible pour les composants existants (sans faux compteurs ni faux badges)
+    val defaultViralTemplates: List<ViralVideoTemplate> get() = officialPanuTemplates.map { tpl ->
+        ViralVideoTemplate(
+            id = tpl.id,
+            title = tpl.title,
+            description = tpl.description,
+            category = tpl.category,
+            stylePreset = tpl.stylePreset,
+            promptTemplate = tpl.basePrompt,
+            previewVideoUrl = tpl.previewVideoUrl,
+            thumbnailUrl = tpl.thumbnailUrl,
+            durationSeconds = tpl.durationSeconds,
+            formatLabel = tpl.formatLabel,
+            aspectRatio = tpl.aspectRatio,
+            recommendedEngine = tpl.recommendedEngine
+        )
+    }
+
+    /**
+     * Récupère la liste réelle des templates PANU (Supabase ou templates officiels PANU)
+     */
+    suspend fun fetchPanuTemplates(): List<PanuTemplate> = withContext(Dispatchers.IO) {
+        val endpoint = "/rest/v1/video_templates?order=created_at.desc"
+        when (val resp = client.execute(endpoint)) {
+            is SupabaseResponse.Success -> {
+                val arr = resp.asJsonArray() ?: JSONArray()
+                if (arr.length() > 0) {
+                    val dbList = mutableListOf<PanuTemplate>()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        dbList.add(
+                            PanuTemplate(
+                                id = obj.optString("id", UUID.randomUUID().toString()),
+                                title = obj.optString("title", "Template PANU"),
+                                description = obj.optString("description", ""),
+                                category = obj.optString("category", "🔥 Tendances"),
+                                formatLabel = obj.optString("format_label", "Vertical (9:16)"),
+                                aspectRatio = obj.optString("aspect_ratio", "9:16"),
+                                durationSeconds = obj.optInt("duration_seconds", 15),
+                                durationLabel = "${obj.optInt("duration_seconds", 15)}\"",
+                                previewVideoUrl = obj.optString("preview_video_url", ""),
+                                thumbnailUrl = obj.optString("thumbnail_url", ""),
+                                basePrompt = obj.optString("prompt_template", ""),
+                                stylePreset = obj.optString("style_preset", "Cinématographique")
+                            )
+                        )
+                    }
+                    dbList
+                } else {
+                    officialPanuTemplates
+                }
+            }
+            else -> officialPanuTemplates
+        }
+    }
 
     /**
      * Récupère les flux en direct actifs 100% réels depuis la table Supabase `lives`.

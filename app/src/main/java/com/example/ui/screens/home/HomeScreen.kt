@@ -46,6 +46,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Close
+import com.example.data.repository.GeminiRepository
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import com.example.ui.components.CreatorSuggestionDialog
 import com.example.ui.components.PanuWatermarkExporterDialog
 import com.example.ui.components.ReferralProgramDialog
@@ -115,6 +119,7 @@ private val DEFAULT_VIRAL_TIKTOK_POSTS = emptyList<Post>()
 fun HomeScreen(
     postRepository: PostRepository,
     featuresService: SupabasePanuFeaturesService? = null,
+    geminiRepository: GeminiRepository? = null,
     isLoggedIn: Boolean = false,
     isFounder: Boolean = false,
     onNavigate: (String) -> Unit,
@@ -147,6 +152,16 @@ fun HomeScreen(
             !authorName.contains("emmanuel matia") &&
             !authorUsername.contains("emmanuelmatia")
         }
+    }
+
+    // Recherche Sémantique IA Gemini (par Concept : ex. 'images de futur africain')
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchConceptQuery by remember { mutableStateOf("") }
+    var isSearchingWithGemini by remember { mutableStateOf(false) }
+    var semanticSearchResults by remember { mutableStateOf<List<Post>?>(null) }
+
+    val displayedPosts = remember(posts, semanticSearchResults) {
+        semanticSearchResults ?: posts
     }
 
     // Par défaut : Flux Vertical Vidéos Virales en lecture automatique
@@ -260,9 +275,133 @@ fun HomeScreen(
         topBar = {
             Column {
                 PanuTopBar(
-                    onSearchClick = { /* Action recherche */ },
+                    onSearchClick = {
+                        isSearchActive = !isSearchActive
+                        if (!isSearchActive) {
+                            searchConceptQuery = ""
+                            semanticSearchResults = null
+                        }
+                    },
                     onMenuClick = onMenuClick
                 )
+
+                // Panneau de Recherche Sémantique IA Gemini (Par Concept)
+                if (isSearchActive) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = searchConceptQuery,
+                                    onValueChange = { newQ ->
+                                        searchConceptQuery = newQ
+                                        if (newQ.isBlank()) {
+                                            semanticSearchResults = null
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("home_semantic_search_input"),
+                                    placeholder = {
+                                        Text(
+                                            "Chercher par concept (ex: 'images de futur africain')...",
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = "Gemini",
+                                            tint = colors.champagne,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        if (searchConceptQuery.isNotBlank()) {
+                                            IconButton(onClick = {
+                                                searchConceptQuery = ""
+                                                semanticSearchResults = null
+                                            }) {
+                                                Icon(Icons.Default.Close, contentDescription = "Effacer", modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+
+                                Button(
+                                    onClick = {
+                                        if (searchConceptQuery.isNotBlank() && !isSearchingWithGemini) {
+                                            isSearchingWithGemini = true
+                                            scope.launch {
+                                                val results = geminiRepository?.searchSemantically(searchConceptQuery, posts) ?: emptyList()
+                                                semanticSearchResults = results
+                                                isSearchingWithGemini = false
+                                                Toast.makeText(context, "✨ ${results.size} publication(s) trouvée(s) pour le concept !", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = !isSearchingWithGemini && searchConceptQuery.isNotBlank(),
+                                    modifier = Modifier.testTag("home_btn_semantic_search")
+                                ) {
+                                    if (isSearchingWithGemini) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = Color.Black,
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Text("Chercher", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (colors.isDark) colors.background else Color.White)
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (semanticSearchResults != null)
+                                        "✨ ${semanticSearchResults!!.size} résultat(s) conceptuel(s) (Gemini 3.5 Flash)"
+                                    else
+                                        "💡 Recherche sémantique IA : explorez par concept au lieu de simples mots-clés",
+                                    fontSize = 11.sp,
+                                    color = colors.champagne,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                if (semanticSearchResults != null) {
+                                    Text(
+                                        text = "Tout réafficher",
+                                        fontSize = 11.sp,
+                                        color = colors.emerald,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable {
+                                            searchConceptQuery = ""
+                                            semanticSearchResults = null
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Barre d'onglets : Flux TikTok Vertical, Fil Classique, Lives, Studio, Vérification Carte
                 LazyRow(
@@ -371,7 +510,7 @@ fun HomeScreen(
                 .padding(padding)
         ) {
             if (selectedTab == "Pour vous") {
-                if (posts.isEmpty()) {
+                if (displayedPosts.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -427,9 +566,9 @@ fun HomeScreen(
                     // =========================================================================
                     // FLUX VERTICAL DE VIDÉOS VIRALES + INTERSTITIEL PUBLICITAIRE TOUTES LES 3 VIDÉOS
                     // =========================================================================
-                    val feedEntries = remember(posts) {
+                    val feedEntries = remember(displayedPosts) {
                         val list = mutableListOf<Post?>()
-                        posts.forEachIndexed { index, post ->
+                        displayedPosts.forEachIndexed { index, post ->
                             list.add(post)
                             // Insertion d'un interstitiel publicitaire dynamique toutes les 3 vidéos (Format Shorts/Reels)
                             if ((index + 1) % 3 == 0) {
@@ -583,7 +722,7 @@ fun HomeScreen(
                     }
                 }
 
-                if (posts.isEmpty()) {
+                if (displayedPosts.isEmpty()) {
                     item {
                         Surface(
                             modifier = Modifier
@@ -617,7 +756,7 @@ fun HomeScreen(
                     }
                 }
 
-                items(posts, key = { it.id }) { post ->
+                items(displayedPosts, key = { it.id }) { post ->
                         val isLiked = likedPosts[post.id] ?: false
                         val currentCount = likesCount[post.id] ?: ((post.id.hashCode() % 40) + 24).coerceAtLeast(10)
 

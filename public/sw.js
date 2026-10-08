@@ -1,7 +1,7 @@
-// PANU Service Worker (sw.js) — Mode Gratuit & Mode Hors-ligne (Style CapCut / PWA)
+// PANU Service Worker (sw.js) — Mode Gratuit & Mode Hors-ligne PANU
 // Permet de consulter les templates, d'accéder au Studio hors-ligne et de synchroniser au retour du réseau.
-const CACHE_NAME = 'panu-capcut-offline-v2';
-const STUDIO_TEMPLATES_CACHE = 'panu-studio-templates-v2';
+const CACHE_NAME = 'panu-offline-v3';
+const STUDIO_TEMPLATES_CACHE = 'panu-studio-templates-v3';
 const OFFLINE_URL = '/';
 
 const PRECACHE_ASSETS = [
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Mise en cache prioritaire des miniatures et templates du Studio (Style CapCut hors-ligne)
+  // Mise en cache prioritaire des miniatures et templates du Studio PANU hors-ligne
   if (
     url.pathname.includes('/rest/v1/canvas_projects') ||
     url.hostname.includes('images.unsplash.com')

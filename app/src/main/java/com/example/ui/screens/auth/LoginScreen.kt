@@ -1155,7 +1155,7 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "⚡ Mode Gratuit & Hors-ligne (Style CapCut / PWA) : édition Studio & templates accessibles sans connexion avec synchronisation auto.",
+                        text = "⚡ Mode Gratuit & Hors-ligne PANU : édition Studio & templates accessibles sans connexion avec synchronisation auto.",
                         color = colors.textSecondary,
                         fontSize = 10.sp
                     )

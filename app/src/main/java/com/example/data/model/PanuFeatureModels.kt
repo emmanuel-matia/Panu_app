@@ -11,7 +11,7 @@ data class PanuNotification(
     val createdAt: String = "À l'instant"
 )
 
-// 2. Modèle de Calque & Projet Studio Graphique (Style Canva -> table canvas_projects)
+// 2. Modèle de Calque & Projet Studio Graphique PANU (table canvas_projects)
 enum class CanvasLayerType(val labelFr: String) {
     TEXT("Texte"),
     IMAGE("Image"),
@@ -44,24 +44,73 @@ data class CanvasProject(
     val updatedAt: String = "Maintenant"
 )
 
-// 3. Modèle de Template Vidéo Viral & Sponsoring Marques (Style CapCut / Pixverse -> table video_templates)
+// 3. Modèle de Template Vidéo Officiel PANU (table video_templates)
 enum class VideoStylePreset(val labelFr: String, val badge: String, val promptEnhancer: String) {
     CINEMATIC(
         "Cinématographique",
-        "🎬 8K Cinéma",
-        "Cinematic 8K documentary shot, ultra-realistic, golden hour lighting, shot on 35mm lens, photorealistic --ar 16:9 --fps 30"
+        "🎬 Cinéma 8K",
+        "Cinematic 8K shot, ultra-realistic, golden hour lighting, shot on 35mm lens, photorealistic, professional color grading"
+    ),
+    MODERN_ADS(
+        "Publicité & Commercial",
+        "📢 Commercial",
+        "Modern luxury commercial advert, clean studio lighting, crisp product showcase, 4K UHD, engaging pacing"
     ),
     ANIMATION_3D(
         "Animation 3D",
-        "🧊 Décor 3D",
-        "Rendu 3D Octane ultra-détaillé, textures vibrantes, éclairage volumétrique studio"
+        "🧊 3D Studio",
+        "High quality 3D stylized render, smooth lighting, vibrant textures, studio look"
     ),
     ANIME(
         "Anime",
-        "⚡ Anime Studio",
-        "Style animation japonaise haute dynamique, lignes fluides, effets visuels épiques, couleurs saturées"
+        "⚡ Anime",
+        "Dynamic high-end animation style, sharp line art, fluid motion, vivid colors"
+    ),
+    REALISTIC(
+        "Réaliste & Documentaire",
+        "📹 Réaliste",
+        "Documentary realism, natural daylight, authentic atmosphere, natural textures"
     )
 }
+
+data class PanuTemplateScene(
+    val index: Int,
+    val name: String,
+    val durationSeconds: Int = 5,
+    val defaultText: String = "",
+    val visualPrompt: String = "",
+    val transition: String = "Fondu enchaîné"
+)
+
+data class PanuTemplateField(
+    val key: String,
+    val label: String,
+    val placeholder: String = "",
+    val isMultiline: Boolean = false,
+    val isImage: Boolean = false
+)
+
+data class PanuTemplate(
+    val id: String,
+    val title: String,
+    val description: String,
+    val category: String, // 🔥 Tendances, 📱 TikTok / Shorts / Reels, 🎬 Cinéma, 📢 Publicité, 🛍️ Produits & commerces, 🎵 Musique, 😂 Humour, 🙏 Église & événements, 🇨🇩 Afrique / RDC, 🎓 Formation, 💼 Entreprise
+    val formatLabel: String = "Vertical (9:16)",
+    val aspectRatio: String = "9:16", // 9:16, 16:9, 1:1
+    val durationSeconds: Int = 15,
+    val durationLabel: String = "15\"",
+    val previewVideoUrl: String = "",
+    val thumbnailUrl: String = "",
+    val scenes: List<PanuTemplateScene> = emptyList(),
+    val editableFields: List<PanuTemplateField> = emptyList(),
+    val musicTrack: String? = null,
+    val transitionEffect: String = "Fondu enchaîné cinématique",
+    val animationEffect: String = "Zoom dynamique",
+    val visualFilter: String = "Contraste chaud & Or",
+    val basePrompt: String = "",
+    val recommendedEngine: String = "MiniMax/Hailuo", // MiniMax/Hailuo, Kling, Luma, Flux/BFL
+    val stylePreset: String = "Cinématographique"
+)
 
 data class ViralVideoTemplate(
     val id: String,
@@ -73,12 +122,11 @@ data class ViralVideoTemplate(
     val previewVideoUrl: String,
     val thumbnailUrl: String,
     val durationSeconds: Int = 15,
-    val usesCount: Int = 1240,
     val ogTitle: String = "",
     val ogImageUrl: String = "",
-    val isSponsoredBrand: Boolean = false,
-    val sponsorBrandName: String? = null,
-    val sponsorBadgeText: String? = null
+    val formatLabel: String = "Vertical (9:16)",
+    val aspectRatio: String = "9:16",
+    val recommendedEngine: String = "MiniMax/Hailuo"
 )
 
 // 4. Modèle de Cadeau Virtuel Live (table live_gifts)

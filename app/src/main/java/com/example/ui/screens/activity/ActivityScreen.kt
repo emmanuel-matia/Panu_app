@@ -42,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import com.example.ui.components.PanuMediaPlayer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,10 +72,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.local.SessionManager
+import com.example.data.model.CanvasProject
 import com.example.data.model.Post
+import com.example.data.remote.SupabasePanuFeaturesService
 import com.example.data.repository.PostRepository
 import com.example.ui.components.PanuBottomNav
 import com.example.ui.components.PanuEmptyState
+import com.example.ui.components.PanuMediaPlayer
 import com.example.ui.components.PanuTopBar
 import com.example.ui.navigation.PanuScreen
 import com.example.ui.theme.PanuChampagne
@@ -110,6 +114,7 @@ fun ActivityScreen(
     sessionManager: SessionManager,
     isFounder: Boolean,
     onNavigate: (String) -> Unit,
+    featuresService: SupabasePanuFeaturesService? = null,
     onMenuClick: (() -> Unit)? = null,
     onNavigateToCreate: () -> Unit,
     onNavigateToFounder: () -> Unit,
@@ -117,10 +122,12 @@ fun ActivityScreen(
 ) {
     val currentUserId by sessionManager.currentUserId.collectAsState()
     val userPosts by postRepository.getUserPosts(currentUserId ?: "").collectAsState(initial = emptyList())
+    val savedCanvasProjects by (featuresService?.savedCanvasProjects ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
     val scope = rememberCoroutineScope()
 
     var activeFilter by remember { mutableStateOf(CreationFilter.ALL) }
     var selectedPostForPreview by remember { mutableStateOf<Post?>(null) }
+    var selectedCanvasProjectForPreview by remember { mutableStateOf<CanvasProject?>(null) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
     var operationError by remember { mutableStateOf<String?>(null) }
@@ -289,25 +296,14 @@ fun ActivityScreen(
                                 )
                             }
                             "video" -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(180.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(PanuSurfaceElevated),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            Icons.Default.VideoFile,
-                                            contentDescription = null,
-                                            tint = PanuGold,
-                                            modifier = Modifier.size(48.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text("Fichier vidéo Supabase", color = PanuTextSecondaryDark, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
+                                PanuMediaPlayer(
+                                    mediaUrl = preview.mediaUrl ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                                    thumbnailUrl = "",
+                                    title = preview.title ?: "Création Vidéo PANU",
+                                    durationLabel = "HD",
+                                    isVideo = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                             "audio" -> {
                                 Box(
@@ -365,6 +361,52 @@ fun ActivityScreen(
             containerColor = PanuSurfaceDark,
             titleContentColor = PanuTextPrimaryDark,
             textContentColor = PanuTextPrimaryDark
+        )
+    }
+
+    // Dialog pour l'Aperçu Média Direct des Projets Studio (table canvas_projects)
+    if (selectedCanvasProjectForPreview != null) {
+        val proj = selectedCanvasProjectForPreview!!
+        val context = androidx.compose.ui.platform.LocalContext.current
+        AlertDialog(
+            onDismissRequest = { selectedCanvasProjectForPreview = null },
+            title = {
+                Text(
+                    text = proj.title,
+                    fontWeight = FontWeight.Bold,
+                    color = PanuTextPrimaryDark
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val mediaUrl = proj.previewUrl ?: proj.layers.firstOrNull { it.type == com.example.data.model.CanvasLayerType.IMAGE }?.content ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                    PanuMediaPlayer(
+                        mediaUrl = mediaUrl,
+                        title = proj.title,
+                        durationLabel = "Projet Studio",
+                        isVideo = proj.exportFormat == "MP4",
+                        onDownload = {
+                            android.widget.Toast.makeText(context, "📥 Projet « ${proj.title} » téléchargé !", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                    Text(
+                        text = "Format d'export : ${proj.exportFormat} • Enregistré dans Supabase canvas_projects",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = PanuGold
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedCanvasProjectForPreview = null }) {
+                    Text("Fermer", color = PanuGold)
+                }
+            },
+            containerColor = PanuSurfaceDark,
+            titleContentColor = PanuTextPrimaryDark,
+            textContentColor = PanuTextSecondaryDark
         )
     }
 
@@ -456,8 +498,9 @@ fun ActivityScreen(
                 }
             }
 
-            // Posts list
-            if (filteredPosts.isEmpty()) {
+            // Posts & Canvas Projects list
+            val showCanvasProjects = (activeFilter == CreationFilter.ALL || activeFilter == CreationFilter.STUDIO_IA || activeFilter == CreationFilter.VIDEOS) && savedCanvasProjects.isNotEmpty()
+            if (filteredPosts.isEmpty() && !showCanvasProjects) {
                 PanuEmptyState(
                     title = "Aucune création trouvée",
                     subtitle = "Créez du contenu réel depuis la caméra, la galerie ou le Studio IA.",
@@ -471,6 +514,34 @@ fun ActivityScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    if (showCanvasProjects) {
+                        item {
+                            Text(
+                                text = "✨ Projets Studio & Vidéos IA (table canvas_projects)",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = PanuGold,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                        }
+                        items(savedCanvasProjects, key = { "canvas_${it.id}" }) { proj ->
+                            CanvasProjectCard(
+                                project = proj,
+                                onPreview = { selectedCanvasProjectForPreview = proj }
+                            )
+                        }
+                        if (filteredPosts.isNotEmpty()) {
+                            item {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "📱 Publications & Médias Utilisateur",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = PanuTextPrimaryDark,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
                     items(filteredPosts, key = { it.id }) { post ->
                         CreationCard(
                             post = post,
@@ -491,6 +562,75 @@ fun ActivityScreen(
                             }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CanvasProjectCard(
+    project: CanvasProject,
+    onPreview: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onPreview)
+            .testTag("canvas_project_${project.id}"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = PanuSurfaceDark),
+        border = androidx.compose.foundation.BorderStroke(1.dp, PanuGold.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = PanuGold.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = "✨ STUDIO IA • ${project.exportFormat}",
+                        color = PanuGold,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Text(
+                    text = project.updatedAt,
+                    color = PanuTextSecondaryDark,
+                    fontSize = 11.sp
+                )
+            }
+            Text(
+                text = project.title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = PanuTextPrimaryDark
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${project.layers.size} calques • Rendu ${project.exportFormat} prêt",
+                    fontSize = 12.sp,
+                    color = PanuTextSecondaryDark
+                )
+                Button(
+                    onClick = onPreview,
+                    colors = ButtonDefaults.buttonColors(containerColor = PanuGold),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = PanuObsidian, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Lire le média", color = PanuObsidian, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }

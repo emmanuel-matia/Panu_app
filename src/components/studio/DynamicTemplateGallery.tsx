@@ -429,19 +429,19 @@ export const PANU_DYNAMIC_TEMPLATES: StudioTemplateItem[] = [
 
   // ANCIENS TEMPLATES (GARDÉS POUR COMPATIBILITÉ)
   {
-    id: 'tpl_capcut_afro_viral',
+    id: 'tpl_panu_afro_viral',
     category: 'capcut_clip',
-    categoryLabel: 'Clips CapCut Viraux',
-    title: 'Clip CapCut & PixVerse : Effet Vitesse & Transitions Virales',
-    badge: '🎬 CapCut & PixVerse • Veo 3.1',
+    categoryLabel: 'Templates Vidéo PANU',
+    title: 'Vidéo Dynamique PANU : Effet Vitesse & Transitions',
+    badge: '🎬 Vidéo IA PANU',
     task: 'viral_video',
     recommendedProvider: 'gemini',
     recommendedModel: 'veo-3.1',
-    aiEngine: 'Moteur PixVerse 2.5 & CapCut Speed-Ramp',
+    aiEngine: 'Moteur IA Vidéo PANU',
     stylePreset: 'Cinematic High-Energy 4K (Kinshasa / Lagos Pulse)',
     aspectRatio: '9:16 (Format Vertical TikTok / Reels / Shorts)',
     soundDesignTrack: 'Afro-House 124 BPM avec transition basse percutante',
-    defaultPrompt: 'Dynamique clip viral 9:16, découpage rapide style CapCut avec zoom avant/arrière fluide sur les temps forts, transitions lumineuses dorées et colorimétrie contrastée.',
+    defaultPrompt: 'Dynamique clip viral 9:16, découpage rapide avec zoom avant/arrière fluide sur les temps forts, transitions lumineuses dorées et colorimétrie contrastée.',
     previewImage: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
     explicitInstructions: ['Application d’un effet Speed-Ramp.', 'Étalonnage colorimétrique chaud.'],
   },
@@ -456,7 +456,7 @@ interface DynamicTemplateGalleryProps {
 
 /**
  * MOTEUR D'EXÉCUTION DE TEMPLATES VIDÉO & INSTRUCTIONS IA
- * Chaque template contient ses consignes explicites (style, montage CapCut/PixVerse, effets).
+ * Chaque template contient ses consignes explicites (style, montage Studio PANU, effets).
  * L'IA lit et applique automatiquement toutes ces consignes sur les médias de l'utilisateur.
  */
 export const DynamicTemplateGallery: React.FC<DynamicTemplateGalleryProps> = ({
@@ -478,7 +478,7 @@ export const DynamicTemplateGallery: React.FC<DynamicTemplateGalleryProps> = ({
   // Identifiant utilisateur authentifié garanti
   const [localUserId, setLocalUserId] = useState<string>(currentUserId || '');
 
-  // Canvas interactif pour le montage visuel (style CapCut / Canva)
+  // Canvas interactif pour le montage visuel Studio PANU
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvasTitle, setCanvasTitle] = useState<string>(PANU_DYNAMIC_TEMPLATES[0].title);
   const [canvasSubtitle, setCanvasSubtitle] = useState<string>(PANU_DYNAMIC_TEMPLATES[0].defaultPrompt);
@@ -521,7 +521,7 @@ export const DynamicTemplateGallery: React.FC<DynamicTemplateGalleryProps> = ({
     { key: 'birthday', label: '🎂 Anniversaire' },
     { key: 'star_style', label: '👗 Style de Star' },
     { key: 'trending_others', label: '🔥 Tendances' },
-    { key: 'capcut_clip', label: '🎬 Clips CapCut' },
+    { key: 'capcut_clip', label: '🎬 Vidéos PANU' },
   ];
 
   const filteredTemplates =
@@ -544,7 +544,7 @@ export const DynamicTemplateGallery: React.FC<DynamicTemplateGalleryProps> = ({
     onTemplateSelect?.(tpl);
   };
 
-  // RENDU DU CANVAS WEB INTERACTIF EN TEMPS RÉEL (STYLE CAPCUT / CANVA)
+  // RENDU DU CANVAS WEB INTERACTIF EN TEMPS RÉEL (STUDIO PANU)
   const renderInteractiveCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -572,7 +572,7 @@ export const DynamicTemplateGallery: React.FC<DynamicTemplateGalleryProps> = ({
 
     const drawContent = () => {
       ctx.save();
-      // Animation de caméra (Zoom & Mouvement dynamique CapCut / Pixverse)
+      // Animation de caméra (Zoom & Mouvement dynamique Studio PANU)
       if (isMotionPreview) {
         motionTick.current += 1;
         const zoom = 1 + Math.sin(motionTick.current * 0.04) * 0.06;

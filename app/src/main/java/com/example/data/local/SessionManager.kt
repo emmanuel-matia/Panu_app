@@ -148,6 +148,22 @@ class SessionManager(context: Context) {
             ?: com.example.BuildConfig.FAL_KEY.trim().removeSurrounding("\"")
                 .takeIf { !it.startsWith("YOUR_") } ?: ""
 
+    fun getBflApiKey(): String =
+        prefs.getString("key_bfl_api_key", null)?.trim()
+            ?: System.getenv("BFL_API_KEY")?.trim()
+            ?: "bfl_1gmc2BDqwn8jV16lAOfqVmDTZpvlg6Q8"
+
+    fun getMiniMaxApiKey(): String =
+        prefs.getString("key_minimax_api_key", null)?.trim()
+            ?: System.getenv("MINIMAX_API_KEY")?.trim()
+            ?: "sk-api-3jpl3tSEJLr-ePzksP3PPfzOMHZuXlXUr3SSWU4zN457A_LoTBwZ8OTwYBXStC6TCTUYSfR0pARtn6GCb2rDQB_Dua1rr08w32ib1yHFV4eFY7PTQPRRXWo"
+
+    fun getLumaApiKey(): String =
+        prefs.getString("key_luma_api_key", null)?.trim()
+            ?: System.getenv("lumalabs_API_KEY")?.trim()
+            ?: System.getenv("LUMA_API_KEY")?.trim()
+            ?: "luma-api-JikDuq_GchIzXv4dD5ia1qoqIWMgT421IPR4ZTtfJEw"
+
     fun getReplicateApiKey(): String =
         System.getenv("REPLICATE_API_KEY")?.trim()
             ?: com.example.BuildConfig.REPLICATE_API_KEY.trim().removeSurrounding("\"")

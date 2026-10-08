@@ -103,8 +103,8 @@ class GeminiAIProvider(
             put("generationConfig", genConfig)
         }
 
-        // Use supported model per gemini-api skill: gemini-2.5-flash
-        val model = "gemini-2.5-flash"
+        // Use supported model per gemini-api skill: gemini-3.5-flash
+        val model = "gemini-3.5-flash"
         val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
 
         val request = Request.Builder()

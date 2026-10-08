@@ -3,6 +3,7 @@ package com.example.ui.screens.studio
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,10 +30,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.CanvasLayer
+import com.example.data.model.CanvasLayerType
+import com.example.data.model.CanvasProject
+import com.example.data.remote.SupabasePanuFeaturesService
 import com.example.data.repository.GeminiRepository
+import com.example.data.repository.ai.CreativeMediaService
+import com.example.data.repository.ai.VideoSequenceSegment
+import com.example.ui.components.PanuMediaPlayer
 import kotlinx.coroutines.launch
 
-// Modèle de série / film / documentaire tendance (inclut les Templates Sponsorisés en tête de liste)
+// Modèle de série / film / documentaire PANU
 data class SeriesTemplate(
     val title: String,
     val genre: String,
@@ -40,47 +48,25 @@ data class SeriesTemplate(
     val universe: String,
     val character: String,
     val icon: String,
-    val isSponsoredBrand: Boolean = false,
-    val sponsorBadge: String? = null
+    val previewVideoUrl: String = "",
+    val thumbnailUrl: String = ""
 )
 
 val TRENDING_TEMPLATES = listOf(
     SeriesTemplate(
-        title = "Faites apparaître votre produit dans un décor 3D",
-        genre = "Sponsorisé • Partenariat Marque",
-        visualStyle = "Rendu 3D Photoréaliste 8K, éclairage Golden Hour, caméra orbitale fluide 35mm",
-        universe = "Décor architectural 3D de luxe africain mettant en valeur le produit d'une marque partenaire au centre du cadre",
-        character = "Ambassadeur élégant présentant le produit phare avec reflets dorés et placement sponsor naturel",
-        icon = "⭐",
-        isSponsoredBrand = true,
-        sponsorBadge = "SPONSORISÉ • EN TÊTE DE LISTE"
-    ),
-    SeriesTemplate(
-        title = "Affiche de concert / événement sponsorisée",
-        genre = "Sponsorisé • Événement & Festival",
-        visualStyle = "Cinématographique 8K, drones dynamiques, pyrotechnie dorée, ambiance stade survolté",
-        universe = "Grand concert ou événement culturel sponsorisé dans une métropole africaine illuminée",
-        character = "Artiste vedette sur scène devant une foule en liesse avec écrans géants aux couleurs du sponsor",
-        icon = "🎤",
-        isSponsoredBrand = true,
-        sponsorBadge = "SPONSORISÉ • PARTENARIAT MARQUE"
-    ),
-    SeriesTemplate(
-        title = "Métropole Africaine au Coucher du Soleil (Documentaire 8K)",
-        genre = "Documentaire IA 8K",
-        visualStyle = GeminiRepository.READY_TO_TEST_CINEMATIC_VIDEO_PROMPT,
-        universe = "Survol aérien en drone d'une métropole africaine moderne vibrante à l'heure dorée (Golden Hour)",
-        character = "Narration documentaire immersive 35mm explorant l'architecture hyper-détaillée et l'innovation",
-        icon = "🎬",
-        isSponsoredBrand = false,
-        sponsorBadge = "EXEMPLE PRÊT À TESTER"
+        title = "Les Bâtisseurs de l'Horizon",
+        genre = "Documentaire Grand Format",
+        visualStyle = "Plans aériens cinématiques 8K, éclairage heure dorée, grain pellicule 35mm, photoréaliste",
+        universe = "Immersion visuelle au cœur des innovations et de l'architecture moderne sur le continent",
+        character = "Visionnaires et créateurs bâtissant l'avenir avec audace et créativité",
+        icon = "🎬"
     ),
     SeriesTemplate(
         title = "Les Ombres du Sahel",
-        genre = "Film & Légendes",
+        genre = "Film Épique & Légendes",
         visualStyle = "Cinématographique 8K, éclairage chaud coucher de soleil, grain 35mm, photoréaliste",
         universe = "Un royaume sahélien ancien mystérieux où la sagesse ancestrale rencontre la technologie des étoiles",
-        character = "Amina, 24 ans, exploratrice avec manteau indigo et boussole holographique dorée",
+        character = "Amina, 24 ans, exploratrice avec manteau indigo et boussole dorée",
         icon = "🌙"
     ),
     SeriesTemplate(
@@ -137,7 +123,11 @@ val ACADEMY_EXERCISES = listOf(
 )
 
 @Composable
-fun SeriesGeneratorScreen(repository: GeminiRepository) {
+fun SeriesGeneratorScreen(
+    repository: GeminiRepository,
+    mediaService: CreativeMediaService? = null,
+    featuresService: SupabasePanuFeaturesService? = null
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Films/Séries/Docs IA, 1: Modèles Sponsorisés, 2: Académie
@@ -145,22 +135,92 @@ fun SeriesGeneratorScreen(repository: GeminiRepository) {
     var selectedGenre by remember { mutableStateOf("Documentaire 8K") }
     val genres = listOf("Documentaire 8K", "Film Cinéma IA", "Série Épisodique IA")
 
-    // États du concept pré-remplis avec le Prompt Précis de Création Vidéo (Exemple Prêt à Tester)
+    var selectedDuration by remember { mutableStateOf("10\"") }
+
+    // États du concept
     var title by remember { mutableStateOf("L'Horizon d'Or : Métropole Africaine") }
     var visualStyle by remember { mutableStateOf(GeminiRepository.READY_TO_TEST_CINEMATIC_VIDEO_PROMPT) }
     var universe by remember { mutableStateOf("Survol dynamique en drone d'une métropole africaine moderne vibrante au coucher du soleil (Golden Hour), architecture hyper-détaillée") }
     var character by remember { mutableStateOf("Narration documentaire immersive 35mm & placement sponsor stratégique") }
 
-    var resultText by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    var isGeneratingMedia by remember { mutableStateOf(false) }
+    var generationProgressText by remember { mutableStateOf<String?>(null) }
+    var generatedVideoUrl by remember { mutableStateOf("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") }
+    var generatedSegments by remember { mutableStateOf<List<VideoSequenceSegment>>(emptyList()) }
+    var hasGeneratedMedia by remember { mutableStateOf(false) }
+
     var activeExercise by remember { mutableStateOf<AcademyExercise?>(null) }
     var exerciseAnswer by remember { mutableStateOf("") }
     var exerciseFeedback by remember { mutableStateOf<String?>(null) }
 
-    fun copyToClipboard(label: String, text: String) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-        Toast.makeText(context, "$label copié dans le presse-papiers !", Toast.LENGTH_SHORT).show()
+    fun triggerMediaGeneration(
+        targetPrompt: String,
+        targetTitle: String,
+        targetGenre: String,
+        targetDuration: String
+    ) {
+        if (isGeneratingMedia) return
+        isGeneratingMedia = true
+        generationProgressText = "Initialisation de la production média ($targetDuration)..."
+
+        scope.launch {
+            val service = mediaService ?: CreativeMediaService(com.example.data.local.SessionManager(context))
+            val result = service.generateMediaWithDuration(
+                prompt = targetPrompt,
+                title = targetTitle,
+                durationLabel = targetDuration,
+                stylePreset = targetGenre,
+                onProgress = { status, _ ->
+                    generationProgressText = status
+                }
+            )
+
+            val media = result.getOrNull()
+            if (media != null) {
+                generatedVideoUrl = media.mediaUrl
+                generatedSegments = media.segments
+                hasGeneratedMedia = true
+
+                // Enregistrement direct dans Supabase (canvas_projects et videos)
+                try {
+                    featuresService?.saveGeneratedAiVideoToSupabase(
+                        title = targetTitle,
+                        prompt = targetPrompt,
+                        stylePreset = targetGenre,
+                        videoUrl = media.mediaUrl,
+                        thumbnailUrl = media.thumbnailUrl
+                    )
+
+                    val canvasProject = CanvasProject(
+                        id = "proj_${System.currentTimeMillis()}",
+                        userId = featuresService?.sessionManager?.currentUserId?.value ?: "user",
+                        title = targetTitle,
+                        exportFormat = "MP4",
+                        previewUrl = media.mediaUrl,
+                        layers = listOf(
+                            CanvasLayer(
+                                id = "layer_video",
+                                type = CanvasLayerType.IMAGE,
+                                content = media.mediaUrl,
+                                colorHex = "#E5A93C"
+                            ),
+                            CanvasLayer(
+                                id = "layer_title",
+                                type = CanvasLayerType.TEXT,
+                                content = targetTitle,
+                                colorHex = "#FFFFFF",
+                                fontSizeSp = 28f
+                            )
+                        )
+                    )
+                    featuresService?.saveCanvasProject(canvasProject)
+                } catch (_: Exception) {}
+
+                Toast.makeText(context, "✅ Vidéo ($targetDuration) générée et enregistrée dans Créations !", Toast.LENGTH_LONG).show()
+            }
+            isGeneratingMedia = false
+            generationProgressText = null
+        }
     }
 
     Column(
@@ -206,7 +266,7 @@ fun SeriesGeneratorScreen(repository: GeminiRepository) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Script • Storyboard 3 Scènes • Prompts 8K Midjourney/Runway/Luma • Emplacement Sponsor",
+                            text = "Génération directe de médias (5\", 10\", 19\", 30\", 1', 10') • Synchronisé avec canvas_projects",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -229,7 +289,7 @@ fun SeriesGeneratorScreen(repository: GeminiRepository) {
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Modèles & Sponsors", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                        text = { Text("Univers & Scénarios", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
                         icon = { Icon(Icons.Default.ViewCarousel, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                     Tab(
@@ -253,50 +313,29 @@ fun SeriesGeneratorScreen(repository: GeminiRepository) {
                         selectedGenre = selectedGenre,
                         genres = genres,
                         onSelectGenre = { selectedGenre = it },
+                        selectedDuration = selectedDuration,
+                        onSelectDuration = { selectedDuration = it },
                         title = title,
                         onTitleChange = { title = it },
-                        visualStyle = visualStyle,
-                        onVisualStyleChange = { visualStyle = it },
                         universe = universe,
                         onUniverseChange = { universe = it },
                         character = character,
                         onCharacterChange = { character = it },
-                        isLoading = isLoading,
-                        resultText = resultText,
-                        onLoadReadyToTestPrompt = {
-                            selectedGenre = "Documentaire 8K"
-                            title = "Métropole Africaine 8K au Coucher du Soleil"
-                            visualStyle = GeminiRepository.READY_TO_TEST_CINEMATIC_VIDEO_PROMPT
-                            universe = "Survol dynamique en drone d'une métropole africaine moderne vibrante au coucher du soleil, éclairage Golden Hour, architecture hyper-détaillée"
-                            character = "Narration documentaire immersive tournée au 35mm, 30 FPS"
-                            Toast.makeText(context, "✅ Prompt Vidéo Cinématique 8K chargé !", Toast.LENGTH_SHORT).show()
-                        },
-                        onCopyPrompt8K = {
-                            copyToClipboard("Prompt Vidéo Cinématique 8K", GeminiRepository.READY_TO_TEST_CINEMATIC_VIDEO_PROMPT)
-                        },
-                        onCopySystemPrompt = {
-                            copyToClipboard("Prompt Système Cinéma IA", GeminiRepository.SYSTEM_PROMPT_CINEMA_PRODUCER)
-                        },
-                        onGenerate = {
-                            if (title.isBlank() && universe.isBlank()) {
-                                Toast.makeText(context, "Veuillez renseigner un thème ou une idée", Toast.LENGTH_SHORT).show()
-                                return@SeriesCreationTab
-                            }
-                            isLoading = true
-                            scope.launch {
-                                val fullConcept = """
-                                    Titre / Idée : $title
-                                    Genre choisi : $selectedGenre
-                                    Thème & Intrigue : $universe
-                                    Sujet / Narration : $character
-                                    Prompt Visuel 8K de référence : $visualStyle
-                                """.trimIndent()
-                                resultText = repository.generateScenario(fullConcept, selectedGenre)
-                                isLoading = false
-                            }
-                        },
-                        onCopy = { textToCopy ->
-                            copyToClipboard("Dossier Réalisateur IA", textToCopy)
+                        visualStyle = visualStyle,
+                        onVisualStyleChange = { visualStyle = it },
+                        isGeneratingMedia = isGeneratingMedia,
+                        generationProgressText = generationProgressText,
+                        generatedVideoUrl = generatedVideoUrl,
+                        generatedSegments = generatedSegments,
+                        hasGeneratedMedia = hasGeneratedMedia,
+                        onTriggerGeneration = {
+                            val enrichedPrompt = "$visualStyle. Thème : $universe. Narration : $character"
+                            triggerMediaGeneration(
+                                targetPrompt = enrichedPrompt,
+                                targetTitle = title,
+                                targetGenre = selectedGenre,
+                                targetDuration = selectedDuration
+                            )
                         }
                     )
                 }
@@ -308,8 +347,15 @@ fun SeriesGeneratorScreen(repository: GeminiRepository) {
                             visualStyle = t.visualStyle
                             universe = t.universe
                             character = t.character
+                            generatedVideoUrl = t.previewVideoUrl
                             selectedTab = 0
-                            Toast.makeText(context, "Modèle « ${t.title} » chargé dans le Réalisateur IA !", Toast.LENGTH_SHORT).show()
+                            // Déclenchement automatique de la génération média en arrière-plan sans afficher de bloc texte
+                            triggerMediaGeneration(
+                                targetPrompt = t.visualStyle,
+                                targetTitle = t.title,
+                                targetGenre = t.genre,
+                                targetDuration = selectedDuration
+                            )
                         }
                     )
                 }
@@ -330,10 +376,10 @@ fun SeriesGeneratorScreen(repository: GeminiRepository) {
                         feedback = exerciseFeedback,
                         onSubmitAnswer = { exercise ->
                             if (exerciseAnswer.isBlank()) {
-                                Toast.makeText(context, "Écrivez votre prompt ou concept", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Écrivez votre concept", Toast.LENGTH_SHORT).show()
                                 return@AcademyTab
                             }
-                            exerciseFeedback = "✅ Excellent travail ! Votre proposition respecte la structure '${exercise.title}' avec emplacement sponsor optimisé."
+                            exerciseFeedback = "✅ Excellent travail ! Votre proposition respecte la structure '${exercise.title}' avec format prêt à tourner."
                         }
                     )
                 }
@@ -347,24 +393,25 @@ private fun SeriesCreationTab(
     selectedGenre: String,
     genres: List<String>,
     onSelectGenre: (String) -> Unit,
+    selectedDuration: String,
+    onSelectDuration: (String) -> Unit,
     title: String,
     onTitleChange: (String) -> Unit,
-    visualStyle: String,
-    onVisualStyleChange: (String) -> Unit,
     universe: String,
     onUniverseChange: (String) -> Unit,
     character: String,
     onCharacterChange: (String) -> Unit,
-    isLoading: Boolean,
-    resultText: String,
-    onLoadReadyToTestPrompt: () -> Unit,
-    onCopyPrompt8K: () -> Unit,
-    onCopySystemPrompt: () -> Unit,
-    onGenerate: () -> Unit,
-    onCopy: (String) -> Unit
+    visualStyle: String,
+    onVisualStyleChange: (String) -> Unit,
+    isGeneratingMedia: Boolean,
+    generationProgressText: String?,
+    generatedVideoUrl: String,
+    generatedSegments: List<VideoSequenceSegment>,
+    hasGeneratedMedia: Boolean,
+    onTriggerGeneration: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    var showSystemPromptDetails by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -374,58 +421,127 @@ private fun SeriesCreationTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // CARTE A : Prompt Système Backend Officiel (Réalisateur & Producteur de Cinéma IA)
+        // 1. LECTEUR MÉDIA DIRECT (REMPLACEMENT DES CARTES DE TEXTE DE PROMPT)
+        Text(
+            text = "🎬 Aperçu Vidéo Photoréaliste Direct (Lecteur MP4 8K) :",
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        PanuMediaPlayer(
+            mediaUrl = generatedVideoUrl,
+            title = title,
+            durationLabel = selectedDuration,
+            isVideo = true,
+            onDownload = {
+                Toast.makeText(context, "📥 Téléchargement de « $title.mp4 » lancé !", Toast.LENGTH_SHORT).show()
+            },
+            onShare = {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, "🎬 Regardez « $title » ($selectedDuration) généré sur PANU Studio : $generatedVideoUrl")
+                }
+                context.startActivity(Intent.createChooser(intent, "Partager la vidéo"))
+            }
+        )
+
+        // 2. GESTION DES DURÉES ET FORMATS (5", 10", 19", 30", 1', 10')
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5A93C).copy(alpha = 0.6f))
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Timer, contentDescription = null, tint = Color(0xFFE5A93C))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Formats & Durées (Appel Direct ou Multi-Séquences) :",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFFE5A93C))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "A. Prompt Système : Réalisateur & Producteur IA",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                    CreativeMediaService.SUPPORTED_DURATIONS.forEach { dur ->
+                        val isSelected = selectedDuration == dur
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onSelectDuration(dur) },
+                            label = {
+                                Text(
+                                    text = dur,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFE5A93C),
+                                selectedLabelColor = Color.Black
+                            )
                         )
                     }
-                    TextButton(onClick = { showSystemPromptDetails = !showSystemPromptDetails }) {
-                        Text(if (showSystemPromptDetails) "Masquer" else "Voir le Prompt")
-                    }
                 }
+
                 Text(
-                    text = "Génère automatiquement : 1. Concept & Synopsis • 2. Structure en 3 Scènes (Introduction, Climax, Conclusion + Voix Off) • 3. Prompts 8K Photoréalistes (Midjourney/Runway/Luma) • 4. Emplacement Sponsor/Publicité.",
-                    fontSize = 12.sp,
+                    text = if (CreativeMediaService.parseDurationLabelToSeconds(selectedDuration) <= 10)
+                        "⚡ Format court ($selectedDuration) : Appel direct à l'API vidéo Fal.ai Kling / Veo."
+                    else
+                        "🎞️ Format long ($selectedDuration) : Découpage automatique en séquences de 5 à 10s en arrière-plan, génération unitaire et assemblage dans canvas_projects avec voix off.",
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (showSystemPromptDetails) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = GeminiRepository.SYSTEM_PROMPT_CINEMA_PRODUCER,
-                                fontSize = 11.sp,
-                                lineHeight = 17.sp
-                            )
-                            OutlinedButton(
-                                onClick = onCopySystemPrompt,
-                                modifier = Modifier.fillMaxWidth()
+            }
+        }
+
+        // 3. Séquences découpées pour formats longs (si disponibles)
+        if (generatedSegments.isNotEmpty()) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2ED573))
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Layers, contentDescription = null, tint = Color(0xFF2ED573))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Séquences Assemblées (${generatedSegments.size} segments) :",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                    generatedSegments.forEach { seg ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(seg.title, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(seg.voiceOverText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(
+                                color = Color(0xFF2ED573).copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copier le Prompt Système Backend", fontSize = 12.sp)
+                                Text(
+                                    text = "${seg.durationSeconds}s",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2ED573),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
                             }
                         }
                     }
@@ -433,62 +549,7 @@ private fun SeriesCreationTab(
             }
         }
 
-        // CARTE B : Prompt Précis de Création Vidéo 8K (Exemple Prêt à Tester)
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2ED573).copy(alpha = 0.6f))
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Videocam, contentDescription = null, tint = Color(0xFF2ED573))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "B. Prompt Vidéo Cinématique 8K (Prêt à Tester)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        text = "\"${GeminiRepository.READY_TO_TEST_CINEMATIC_VIDEO_PROMPT}\"",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(10.dp)
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = onLoadReadyToTestPrompt,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("btn_load_8k_cinematic_prompt"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ED573))
-                    ) {
-                        Text("Appliquer ce Prompt", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    }
-                    OutlinedButton(
-                        onClick = onCopyPrompt8K,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Copier 8K", fontSize = 11.sp)
-                    }
-                }
-            }
-        }
-
-        // Formulaire de production
+        // 4. Formulaire de paramétrage de la production
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
@@ -499,7 +560,7 @@ private fun SeriesCreationTab(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Genre de la Production IA :", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Genre de la Production :", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -517,7 +578,7 @@ private fun SeriesCreationTab(
                     value = title,
                     onValueChange = onTitleChange,
                     modifier = Modifier.fillMaxWidth().testTag("series_title_input"),
-                    label = { Text("Titre du Film, de la Série ou du Documentaire") },
+                    label = { Text("Titre de la Création") },
                     singleLine = true
                 )
 
@@ -525,7 +586,7 @@ private fun SeriesCreationTab(
                     value = universe,
                     onValueChange = onUniverseChange,
                     modifier = Modifier.fillMaxWidth().testTag("series_universe_input"),
-                    label = { Text("Idée, Thème & Intrigue Principale") },
+                    label = { Text("Thème / Intrigue de la Scène") },
                     minLines = 2
                 )
 
@@ -533,21 +594,14 @@ private fun SeriesCreationTab(
                     value = character,
                     onValueChange = onCharacterChange,
                     modifier = Modifier.fillMaxWidth().testTag("series_character_input"),
-                    label = { Text("Sujet, Personnage & Indications Voix Off") },
+                    label = { Text("Personnage & Voix Off") },
                     minLines = 2
                 )
 
-                OutlinedTextField(
-                    value = visualStyle,
-                    onValueChange = onVisualStyleChange,
-                    modifier = Modifier.fillMaxWidth().testTag("series_style_input"),
-                    label = { Text("Prompt Visuel 8K (Midjourney / Runway / Luma)") },
-                    minLines = 3
-                )
-
+                // Déclenchement automatique sans texte intermédiaire
                 Button(
-                    onClick = onGenerate,
-                    enabled = !isLoading,
+                    onClick = onTriggerGeneration,
+                    enabled = !isGeneratingMedia,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
@@ -555,55 +609,30 @@ private fun SeriesCreationTab(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5A93C))
                 ) {
-                    if (isLoading) {
+                    if (isGeneratingMedia) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(22.dp),
                             color = Color.Black,
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Production du Script, Storyboard & Emplacement Sponsor...", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(
+                            text = generationProgressText ?: "Génération Média ($selectedDuration) en cours...",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
                     } else {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black)
+                        Icon(Icons.Default.Videocam, contentDescription = null, tint = Color.Black)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Générer Script, 3 Scènes 8K & Emplacement Sponsor", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            text = "Générer la Vidéo Directe ($selectedDuration)",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
                     }
-                }
-            }
-        }
-
-        if (resultText.isNotBlank()) {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5A93C))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2ED573))
-                            Text("Storyboard 3 Scènes, Prompts 8K & Emplacement Sponsor", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                        IconButton(onClick = { onCopy(resultText) }) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "Copier")
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    Text(
-                        text = resultText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 22.sp
-                    )
                 }
             }
         }
@@ -654,64 +683,33 @@ private fun AcademyTab(
 
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("💡 Formule Gagnante", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(activeExercise.formula, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("⚡ Conseils d'Experts Viraux :", fontWeight = FontWeight.SemiBold)
+                    Text("💡 Conseils de Réalisation :", fontWeight = FontWeight.Bold)
                     activeExercise.proTips.forEach { tip ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("•", color = MaterialTheme.colorScheme.primary)
-                            Text(tip, style = MaterialTheme.typography.bodySmall)
-                        }
+                        Text("• $tip", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            OutlinedTextField(
+                value = userAnswer,
+                onValueChange = onAnswerChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Votre proposition") },
+                minLines = 4
+            )
+
+            Button(
+                onClick = { onSubmitAnswer(activeExercise) },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🎯 Exercice Pratique", fontWeight = FontWeight.Bold)
-                    Text(activeExercise.challengePrompt, style = MaterialTheme.typography.bodyMedium)
+                Text("Valider l'exercice")
+            }
 
-                    OutlinedTextField(
-                        value = userAnswer,
-                        onValueChange = onAnswerChange,
-                        modifier = Modifier.fillMaxWidth().testTag("exercise_answer_input"),
-                        label = { Text("Votre proposition de scène / prompt") },
-                        minLines = 4
-                    )
-
-                    Button(
-                        onClick = { onSubmitAnswer(activeExercise) },
-                        modifier = Modifier.fillMaxWidth().testTag("exercise_submit_button"),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Valider l'exercice")
-                    }
-
-                    feedback?.let { fb ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF2ED573).copy(alpha = 0.15f),
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                        ) {
-                            Text(
-                                text = fb,
-                                modifier = Modifier.padding(12.dp),
-                                color = Color(0xFF009432),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-                }
+            if (feedback != null) {
+                Text(feedback, color = Color(0xFF2ED573), fontWeight = FontWeight.Bold)
             }
         }
     } else {
@@ -722,19 +720,8 @@ private fun AcademyTab(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    text = "Académie de Réalisation & Monétisation IA",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Maîtrisez le découpage en 3 scènes, les prompts 8K Midjourney/Runway/Luma et l'intégration de placements sponsorisés.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
-                )
+                Text("Modules Pratiques de l'Académie", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-
             items(ACADEMY_EXERCISES) { exercise ->
                 Card(
                     modifier = Modifier
@@ -776,12 +763,12 @@ private fun TemplatesTab(
     ) {
         item {
             Text(
-                text = "Templates Sponsorisés (Partenariats Marques) & Tendances",
+                text = "Univers & Scénarios Prédéfinis PANU",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Les marques partenaires apparaissent en tête de liste. Sélectionnez un modèle sponsorisé ou documentaire 8K en 1 clic.",
+                text = "Sélectionnez un univers pour charger sa structure et lancer sa génération.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
@@ -794,31 +781,12 @@ private fun TemplatesTab(
                     .fillMaxWidth()
                     .clickable { onSelectTemplate(template) },
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = if (template.isSponsoredBrand)
-                    androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFE5A93C))
-                else
-                    null
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (template.sponsorBadge != null) {
-                        Surface(
-                            color = if (template.isSponsoredBrand) Color(0xFFE5A93C) else Color(0xFF2ED573),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = template.sponsorBadge,
-                                color = Color.Black,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -840,13 +808,13 @@ private fun TemplatesTab(
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text("Utiliser", fontSize = 12.sp)
+                            Text("Utiliser", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    Text("👤 Sujet / Placement : ${template.character}", style = MaterialTheme.typography.bodySmall)
+                    Text("👤 Sujet / Narration : ${template.character}", style = MaterialTheme.typography.bodySmall)
                     Text("🌍 Décor / Univers : ${template.universe}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

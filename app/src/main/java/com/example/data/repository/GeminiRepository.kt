@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.model.Post
 import com.example.data.remote.Content
 import com.example.data.remote.ContentRequest
 import com.example.data.remote.GeminiApiService
@@ -100,5 +101,93 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
 • Emplacement idéal : Sur l'écran holographique géant d'un bâtiment au cœur du plan drone ou sur la table du studio au début de la Scène 2 (ex. boisson, smartphone, banque Mobile Money ou marque partenaire locale).
 • Pause Publicitaire Sponsorisée (Mid-Roll 5s) : À 0:15 exactement, juste après la phrase d'accroche de l'Introduction et avant la révélation du Climax, garantissant un taux de rétention de 92 % sans casser la tension narrative.
         """.trimIndent()
+    }
+
+    /**
+     * Recherche sémantique conceptuelle propulsée par Google Gemini (gemini-3.5-flash)
+     * Permet à l'utilisateur de chercher par concept (ex: 'images de futur africain') au lieu de seulement par mots-clés.
+     */
+    suspend fun searchSemantically(conceptQuery: String, posts: List<Post>): List<Post> = withContext(Dispatchers.IO) {
+        if (conceptQuery.isBlank() || posts.isEmpty()) return@withContext posts
+
+        val cleanQuery = conceptQuery.trim()
+
+        if (apiKey.isNotBlank() && !apiKey.startsWith("YOUR_")) {
+            try {
+                val candidateSummaries = posts.take(20).mapIndexed { idx, p ->
+                    "[ID:${p.id}] Titre: ${p.title ?: "Sans titre"} | Type: ${p.mediaType} | Texte: ${p.content.take(120)} | Auteur: ${p.authorName ?: "Créateur"}"
+                }.joinToString("\n")
+
+                val prompt = """
+                    Tu es le moteur de recherche sémantique IA de l'application PANU.
+                    L'utilisateur effectue une recherche par CONCEPT : "$cleanQuery" (ex: "images de futur africain", "créations musicales urbaines", "mode afro chic", etc.).
+                    
+                    Parmi les publications ci-dessous, sélectionne et ordonne celles qui correspondent sémantiquement à ce concept, même si les mots exacts ne figurent pas textuellement dans la publication (par exemple : le concept 'images de futur africain' correspond à des photos/images d'afrofuturisme, métropoles modernes, graphisme 3D, architecture contemporaine, etc.) :
+                    
+                    $candidateSummaries
+                    
+                    Réponds UNIQUEMENT avec la liste des IDs correspondants séparés par une virgule, du plus pertinent au moins pertinent. Exemple : ID1, ID2. Si aucune publication ne correspond, réponds "AUCUN".
+                """.trimIndent()
+
+                val request = ContentRequest(listOf(Content(listOf(Part(prompt)))))
+                val response = apiService.generateContent(apiKey, request)
+                val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+
+                if (reply.isNotBlank() && !reply.contains("AUCUN", ignoreCase = true)) {
+                    val matchedIds = reply.split(",")
+                        .map { it.trim().removePrefix("[").removeSuffix("]").removePrefix("ID:").trim() }
+                        .filter { it.isNotBlank() }
+
+                    val matchedPosts = matchedIds.mapNotNull { id ->
+                        posts.find { it.id.equals(id, ignoreCase = true) || it.id.contains(id) }
+                    }
+
+                    if (matchedPosts.isNotEmpty()) {
+                        return@withContext matchedPosts
+                    }
+                }
+            } catch (_: Exception) {
+                // Fallback vers l'expansion sémantique conceptuelle
+            }
+        }
+
+        fallbackSemanticFilter(cleanQuery, posts)
+    }
+
+    private fun fallbackSemanticFilter(conceptQuery: String, posts: List<Post>): List<Post> {
+        val q = conceptQuery.lowercase()
+        val tokens = q.split(" ", ",", "-", "'", "•").filter { it.length > 2 }
+
+        val semanticClusters = mapOf(
+            "futur" to listOf("futur", "futuriste", "afrofuturisme", "moderne", "sci-fi", "innovation", "technologie", "demain", "vision", "8k", "3d", "robot", "ia"),
+            "image" to listOf("image", "photo", "visuel", "affiche", "png", "illustration", "art", "tableau", "design", "carousel"),
+            "images" to listOf("image", "photo", "visuel", "affiche", "png", "illustration", "art", "tableau", "design", "carousel"),
+            "africain" to listOf("africain", "afrique", "dakar", "lagos", "kinshasa", "abidjan", "kigali", "sahara", "sahel", "yoruba", "kongo", "métropole", "continent"),
+            "video" to listOf("video", "vidéo", "film", "série", "documentaire", "drone", "mp4", "cinema", "cinématique", "caméra"),
+            "musique" to listOf("musique", "son", "audio", "afrobeats", "amapiano", "rythme", "chanson", "piste"),
+            "culture" to listOf("culture", "tradition", "patrimoine", "héritage", "art", "histoire")
+        )
+
+        val expandedKeywords = mutableSetOf<String>()
+        expandedKeywords.addAll(tokens)
+
+        for (token in tokens) {
+            semanticClusters[token]?.let { expandedKeywords.addAll(it) }
+            for ((key, cluster) in semanticClusters) {
+                if (key.contains(token) || token.contains(key)) {
+                    expandedKeywords.addAll(cluster)
+                }
+            }
+        }
+
+        val filtered = posts.filter { post ->
+            val textToSearch = "${post.title ?: ""} ${post.content} ${post.mediaType} ${post.authorName ?: ""}".lowercase()
+            expandedKeywords.any { kw -> textToSearch.contains(kw) }
+        }
+
+        return if (filtered.isNotEmpty()) filtered else posts.filter { post ->
+            val textToSearch = "${post.title ?: ""} ${post.content}".lowercase()
+            tokens.any { textToSearch.contains(it) }
+        }
     }
 }

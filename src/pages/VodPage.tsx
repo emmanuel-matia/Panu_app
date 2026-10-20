@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShareButtonWithOpenGraph } from '../components/share/ShareButtonWithOpenGraph';
 import { PanuTopNavbar } from '../components/nav/PanuTopNavbar';
 import { DynamicTemplateGallery } from '../components/studio/DynamicTemplateGallery';
+import { PanuVideoPlayer } from '../components/media/PanuVideoPlayer';
 
 export const VodPage: React.FC = () => {
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
@@ -27,13 +28,24 @@ export const VodPage: React.FC = () => {
           />
         </div>
 
+        {/* Lecteur Vidéo Principal VOD / Séries (Media3 ExoPlayer Web & Mobile) */}
+        <div style={{ marginBottom: 24 }}>
+          <PanuVideoPlayer
+            src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4"
+            title="Neo-Kinshasa 2099 • Épisode Pilote IA (8K)"
+            autoplay={false}
+            loop={true}
+            muted={false}
+          />
+        </div>
+
         <div style={{ backgroundColor: '#151622', border: '1px solid rgba(229,169,60,0.3)', borderRadius: 16, padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 44, marginBottom: 12 }}>🎥</div>
           <h3 style={{ color: '#E5A93C', margin: '0 0 8px', fontSize: 18 }}>
-            Prêt pour les Nouvelles Sorties VOD Réelles
+            Catalogue & Studio Vidéo PANU VOD
           </h3>
           <p style={{ color: '#BBB', fontSize: 13, maxWidth: 500, margin: '0 auto 20px', lineHeight: 1.5 }}>
-            Zéro contenu factice. Les créateurs et studios partenaires publient directement leurs séries et documentaires ici via le Studio IA PANU.
+            Zéro contenu factice. Les créateurs et studios partenaires publient directement leurs séries, films et documentaires 8K ici via le Studio IA PANU.
           </p>
           <button
             type="button"
@@ -49,7 +61,7 @@ export const VodPage: React.FC = () => {
               cursor: 'pointer',
             }}
           >
-            🎬 Créer une Bande-Annonce avec les Templates IA
+            🎬 Créer une Nouvelle Bande-Annonce avec les Templates IA
           </button>
         </div>
       </div>

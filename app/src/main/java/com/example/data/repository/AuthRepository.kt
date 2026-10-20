@@ -232,6 +232,10 @@ class AuthRepository(
         return authService.verifyAndRestoreSession()
     }
 
+    suspend fun sendPasswordResetEmail(email: String): Result<String> {
+        return authService.sendPasswordResetEmail(email)
+    }
+
     suspend fun logout(): Result<Unit> {
         return authService.signOut()
     }

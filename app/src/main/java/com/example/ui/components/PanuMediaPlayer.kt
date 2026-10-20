@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,12 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -30,6 +34,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.ui.theme.PanuTheme
+import com.example.ui.util.PanuMediaConstants
 import kotlinx.coroutines.delay
 
 @Composable
@@ -39,12 +44,253 @@ fun PanuMediaPlayer(
     title: String = "Média PANU",
     durationLabel: String = "10\"",
     isVideo: Boolean = true,
+    mediaType: String = "", // "video", "image", "audio"
     modifier: Modifier = Modifier,
     onDownload: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val colors = PanuTheme.colors
+    val haptic = LocalHapticFeedback.current
+
+    val resolvedType = remember(mediaUrl, mediaType, isVideo) {
+        val lowerType = mediaType.lowercase()
+        when {
+            lowerType.contains("image") || lowerType.contains("photo") -> "image"
+            lowerType.contains("audio") || lowerType.contains("music") || lowerType.contains("song") -> "audio"
+            lowerType.contains("video") -> "video"
+            mediaUrl.endsWith(".jpg", true) || mediaUrl.endsWith(".png", true) || mediaUrl.endsWith(".jpeg", true) || mediaUrl.endsWith(".webp", true) -> "image"
+            mediaUrl.endsWith(".mp3", true) || mediaUrl.endsWith(".wav", true) || mediaUrl.endsWith(".m4a", true) || mediaUrl.endsWith(".aac", true) -> "audio"
+            else -> if (isVideo) "video" else "image"
+        }
+    }
+
+    // =========================================================================
+    // 1. GESTION DES PHOTOS / IMAGES
+    // =========================================================================
+    if (resolvedType == "image" && mediaUrl.isNotBlank()) {
+        var showFullImageDialog by remember { mutableStateOf(false) }
+
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, colors.champagne.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .testTag("panu_image_player_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Black)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showFullImageDialog = true
+                    }
+            ) {
+                AsyncImage(
+                    model = mediaUrl,
+                    contentDescription = title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                // Badge Photo
+                Surface(
+                    color = Color.Black.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, colors.champagne.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .align(Alignment.TopStart)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "PHOTO HD • $title", color = colors.champagne, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Légende & Actions en bas (sans aucun contrôle vidéo)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(Color.Black.copy(alpha = 0.75f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (onDownload != null) {
+                            Surface(
+                                color = colors.champagne,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .clickable { onDownload() }
+                                    .testTag("image_btn_download")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = Color.Black, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Enregistrer", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showFullImageDialog) {
+            Dialog(onDismissRequest = { showFullImageDialog = false }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.8f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black)
+                ) {
+                    AsyncImage(
+                        model = mediaUrl,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                    IconButton(
+                        onClick = { showFullImageDialog = false },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = Color.White)
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    // =========================================================================
+    // 2. GESTION DES FICHIERS AUDIO / CHANSONS
+    // =========================================================================
+    if (resolvedType == "audio" && mediaUrl.isNotBlank()) {
+        var isAudioPlaying by remember { mutableStateOf(false) }
+        var isAudioMuted by remember { mutableStateOf(false) }
+
+        val audioPlayer = remember(mediaUrl) {
+            ExoPlayer.Builder(context).build().apply {
+                try {
+                    val mediaSource = ProgressiveMediaSource.Factory(DefaultHttpDataSource.Factory())
+                        .createMediaSource(MediaItem.fromUri(mediaUrl))
+                    setMediaSource(mediaSource)
+                    repeatMode = Player.REPEAT_MODE_ALL
+                    prepare()
+                } catch (_: Exception) {}
+            }
+        }
+
+        DisposableEffect(mediaUrl) {
+            val listener = object : Player.Listener {
+                override fun onIsPlayingChanged(playing: Boolean) {
+                    isAudioPlaying = playing
+                }
+            }
+            audioPlayer.addListener(listener)
+            onDispose {
+                audioPlayer.removeListener(listener)
+                audioPlayer.release()
+            }
+        }
+
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, colors.champagne.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .testTag("panu_audio_player_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    color = colors.champagne,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (audioPlayer.isPlaying) {
+                                audioPlayer.pause()
+                            } else {
+                                audioPlayer.play()
+                            }
+                        }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isAudioPlaying) "Pause" else "Lecture Audio",
+                            tint = Color.Black,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.MusicNote, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "LECTEUR AUDIO PANU", color = colors.champagne, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = title, color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(text = "Audio Haute Fidélité • $durationLabel", color = colors.textSecondary, fontSize = 11.sp)
+                }
+
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isAudioMuted = !isAudioMuted
+                        audioPlayer.volume = if (isAudioMuted) 0f else 1f
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (isAudioMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                        contentDescription = "Volume",
+                        tint = colors.textPrimary
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    // =========================================================================
+    // 3. GESTION DES VIDÉOS (EXOPLAYER + PLAYERVIEW)
+    // =========================================================================
     var isPlaying by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0f) }
@@ -52,19 +298,20 @@ fun PanuMediaPlayer(
     var hasError by remember { mutableStateOf(false) }
     var useFallbackUrl by remember { mutableStateOf(false) }
 
-    if (isVideo && mediaUrl.isNotBlank()) {
+    if (mediaUrl.isNotBlank()) {
         val exoPlayer = remember(mediaUrl, useFallbackUrl) {
             ExoPlayer.Builder(context).build().apply {
                 try {
                     val dataSourceFactory = DefaultHttpDataSource.Factory()
-                        .setUserAgent("PANU-Mobile-App/2.0 (Linux; Android)")
-                        .setConnectTimeoutMs(15000)
-                        .setReadTimeoutMs(15000)
+                        .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36 PANU/2.0")
+                        .setAllowCrossProtocolRedirects(true)
+                        .setConnectTimeoutMs(20000)
+                        .setReadTimeoutMs(20000)
 
-                    val targetUrl = if (useFallbackUrl || hasError || mediaUrl.isBlank() || mediaUrl.contains("fal.ai", ignoreCase = true) || mediaUrl.contains("luma", ignoreCase = true) || mediaUrl.contains("minimax", ignoreCase = true) || mediaUrl.contains("supabase", ignoreCase = true)) {
-                        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+                    val targetUrl = if (useFallbackUrl) {
+                        PanuMediaConstants.DEFAULT_FALLBACK_VIDEO
                     } else {
-                        mediaUrl
+                        PanuMediaConstants.resolvePlayableUrl(mediaUrl)
                     }
 
                     val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
@@ -86,8 +333,12 @@ fun PanuMediaPlayer(
                     isPlaying = playing
                 }
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                    hasError = true
-                    useFallbackUrl = true
+                    if (!useFallbackUrl) {
+                        useFallbackUrl = true
+                        hasError = false
+                    } else {
+                        hasError = true
+                    }
                 }
             }
             exoPlayer.addListener(listener)
@@ -97,7 +348,7 @@ fun PanuMediaPlayer(
             }
         }
 
-        // Coroutine to track playback progress
+        // Coroutine pour suivre la progression de la vidéo
         LaunchedEffect(exoPlayer) {
             while (true) {
                 try {
@@ -125,7 +376,6 @@ fun PanuMediaPlayer(
                     .height(240.dp)
             ) {
                 if (hasError && !useFallbackUrl) {
-                    // Error state with retry / fallback switch
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -136,7 +386,7 @@ fun PanuMediaPlayer(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Accès restreint (403) ou erreur réseau", color = Color.White, fontSize = 12.sp)
+                            Text("Fichier vidéo indisponible ou accès restreint", color = Color.White, fontSize = 12.sp)
                             Button(
                                 onClick = {
                                     hasError = false
@@ -144,7 +394,7 @@ fun PanuMediaPlayer(
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = colors.champagne)
                             ) {
-                                Text("Basculer sur le flux de secours", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Basculer sur la vidéo de secours", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
                         }
                     }
@@ -163,11 +413,11 @@ fun PanuMediaPlayer(
                         modifier = Modifier
                             .fillMaxSize()
                             .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
                             }
                     )
 
-                    // Thumbnail overlay when paused or starting
                     if (!isPlaying && thumbnailUrl.isNotBlank() && currentPosition < 200f) {
                         AsyncImage(
                             model = thumbnailUrl,
@@ -178,7 +428,7 @@ fun PanuMediaPlayer(
                     }
                 }
 
-                // En-tête avec Badges Format, Durée et Bouton Mute
+                // En-tête avec Badges Format et Mute
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -190,7 +440,7 @@ fun PanuMediaPlayer(
                     Surface(
                         color = Color.Black.copy(alpha = 0.75f),
                         shape = RoundedCornerShape(6.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne.copy(alpha = 0.6f))
+                        border = BorderStroke(1.dp, colors.champagne.copy(alpha = 0.6f))
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -212,31 +462,29 @@ fun PanuMediaPlayer(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // Bouton Mute
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.65f),
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clickable {
-                                    isMuted = !isMuted
-                                    exoPlayer.volume = if (isMuted) 0f else 1f
-                                }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                                    contentDescription = if (isMuted) "Muet" else "Son actif",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.65f),
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                isMuted = !isMuted
+                                exoPlayer.volume = if (isMuted) 0f else 1f
                             }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                contentDescription = if (isMuted) "Muet" else "Son actif",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
 
-                // Barre de progression en bas au-dessus des contrôles
+                // Barre de progression
                 if (totalDuration > 0f) {
                     Slider(
                         value = currentPosition,
@@ -258,7 +506,7 @@ fun PanuMediaPlayer(
                     )
                 }
 
-                // Contrôles en bas : Play / Pause, Titre, Télécharger, Partager
+                // Contrôles en bas
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -282,6 +530,7 @@ fun PanuMediaPlayer(
                             modifier = Modifier
                                 .size(34.dp)
                                 .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     if (exoPlayer.isPlaying) {
                                         exoPlayer.pause()
                                     } else {
@@ -354,45 +603,6 @@ fun PanuMediaPlayer(
                             }
                         }
                     }
-                }
-            }
-        }
-    } else {
-        // Lecteur d'Image / Visuel PNG direct
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, colors.champagne.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(230.dp)
-            ) {
-                AsyncImage(
-                    model = if (mediaUrl.isNotBlank()) mediaUrl else thumbnailUrl,
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-
-                Surface(
-                    color = Color.Black.copy(alpha = 0.75f),
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = "VISUEL PNG DIRECT",
-                        color = colors.champagne,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
                 }
             }
         }

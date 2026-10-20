@@ -91,4 +91,8 @@ class PostRepository(
         }
         return postService.deletePost(post.id)
     }
+
+    suspend fun updateLikes(postId: String, newCount: Int): Result<Unit> {
+        return postService.updateLikesCount(postId, newCount)
+    }
 }

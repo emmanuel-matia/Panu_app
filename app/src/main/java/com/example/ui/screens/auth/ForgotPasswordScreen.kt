@@ -150,10 +150,15 @@ fun ForgotPasswordScreen(
                     isLoading = true
                     message = null
                     scope.launch {
-                        // TODO: Implement password reset via AuthViewModel
+                        val result = authRepository.sendPasswordResetEmail(email.trim())
                         isLoading = false
-                        isSuccess = false
-                        message = "Fonctionnalité temporairement désactivée."
+                        if (result.isSuccess) {
+                            isSuccess = true
+                            message = result.getOrNull() ?: "Email de réinitialisation envoyé avec succès."
+                        } else {
+                            isSuccess = false
+                            message = result.exceptionOrNull()?.localizedMessage ?: "Échec de l'envoi de l'email."
+                        }
                     }
                 },
                 enabled = !isLoading,

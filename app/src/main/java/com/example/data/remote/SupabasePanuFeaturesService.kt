@@ -27,6 +27,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -77,6 +79,56 @@ class SupabasePanuFeaturesService(
 
     private val _isOfflineStudioModeActive = MutableStateFlow(true)
     val isOfflineStudioModeActive: StateFlow<Boolean> = _isOfflineStudioModeActive.asStateFlow()
+
+    // Templates créateurs ajoutés ou vendus sur la marketplace PANU
+    private val _creatorTemplates = MutableStateFlow<List<PanuTemplate>>(emptyList())
+    val creatorTemplates: StateFlow<List<PanuTemplate>> = _creatorTemplates.asStateFlow()
+
+    // Services créateurs proposés sur PANU (Réalisation 8K, Montage, Voix Off, etc.)
+    private val _creatorServices = MutableStateFlow<List<com.example.data.model.CreatorServiceOffer>>(
+        listOf(
+            com.example.data.model.CreatorServiceOffer(
+                id = "srv_spot_8k",
+                creatorId = "creator_pro_01",
+                creatorName = "Koffi Studio 8K",
+                title = "Réalisation Spot Commercial 8K & IA",
+                category = "Vidéo 8K",
+                description = "Production complète de spot publicitaire ou teaser cinématique 8K prêt à diffuser avec voix off studio.",
+                priceFcfa = 25000,
+                turnaroundDays = 1,
+                contactWhatsapp = "+225 07 12 34 56 78",
+                rating = 4.9,
+                completedOrders = 38
+            ),
+            com.example.data.model.CreatorServiceOffer(
+                id = "srv_montage_viral",
+                creatorId = "creator_pro_02",
+                creatorName = "Aïcha Viral Edit",
+                title = "Montage Vidéo Viral TikTok / Reels",
+                category = "Montage",
+                description = "Découpage dynamique avec sous-titres animés, sound design percutant et hook des 3 premières secondes garanti.",
+                priceFcfa = 15000,
+                turnaroundDays = 2,
+                contactWhatsapp = "+221 77 98 76 54 32",
+                rating = 5.0,
+                completedOrders = 64
+            ),
+            com.example.data.model.CreatorServiceOffer(
+                id = "srv_voix_off",
+                creatorId = "creator_pro_03",
+                creatorName = "Bakary Voice Lab",
+                title = "Voix Off Professionnelle & Doublage IA",
+                category = "Voix Off",
+                description = "Enregistrement voix off en français, lingala, wolof ou anglais avec mixage audio haute fidélité pour vos documentaires et pubs.",
+                priceFcfa = 10000,
+                turnaroundDays = 1,
+                contactWhatsapp = "+243 81 23 45 67 89",
+                rating = 4.8,
+                completedOrders = 29
+            )
+        )
+    )
+    val creatorServices: StateFlow<List<com.example.data.model.CreatorServiceOffer>> = _creatorServices.asStateFlow()
 
     fun dismissInAppBanner() {
         _inAppBannerNotification.value = null
@@ -835,7 +887,7 @@ class SupabasePanuFeaturesService(
      */
     suspend fun fetchPanuTemplates(): List<PanuTemplate> = withContext(Dispatchers.IO) {
         val endpoint = "/rest/v1/video_templates?order=created_at.desc"
-        when (val resp = client.execute(endpoint)) {
+        val baseList = when (val resp = client.execute(endpoint)) {
             is SupabaseResponse.Success -> {
                 val arr = resp.asJsonArray() ?: JSONArray()
                 if (arr.length() > 0) {
@@ -855,7 +907,10 @@ class SupabasePanuFeaturesService(
                                 previewVideoUrl = obj.optString("preview_video_url", ""),
                                 thumbnailUrl = obj.optString("thumbnail_url", ""),
                                 basePrompt = obj.optString("prompt_template", ""),
-                                stylePreset = obj.optString("style_preset", "Cinématographique")
+                                stylePreset = obj.optString("style_preset", "Cinématographique"),
+                                priceFcfa = obj.optInt("price_fcfa", 0),
+                                creatorName = obj.optString("creator_name").takeIf { it.isNotBlank() },
+                                creatorId = obj.optString("author_id").takeIf { it.isNotBlank() }
                             )
                         )
                     }
@@ -865,6 +920,126 @@ class SupabasePanuFeaturesService(
                 }
             }
             else -> officialPanuTemplates
+        }
+        val custom = _creatorTemplates.value
+        if (custom.isEmpty()) baseList else custom + baseList.filter { b -> custom.none { it.id == b.id } }
+    }
+
+    /**
+     * Publie et met en vente un template créé par un utilisateur PANU.
+     */
+    suspend fun publishCreatorTemplate(
+        title: String,
+        description: String,
+        category: String,
+        basePrompt: String,
+        stylePreset: String,
+        recommendedEngine: String,
+        priceFcfa: Int = 0,
+        aspectRatio: String = "9:16",
+        durationSeconds: Int = 15
+    ): Result<PanuTemplate> = withContext(Dispatchers.IO) {
+        val creatorId = sessionManager.currentUserId.value ?: "creator_${System.currentTimeMillis()}"
+        val creatorName = sessionManager.currentUserEmail.value?.substringBefore("@") ?: "Créateur PANU"
+        val newTemplate = PanuTemplate(
+            id = "tpl_creator_${UUID.randomUUID().toString().take(8)}",
+            title = title.trim(),
+            description = description.trim(),
+            category = category,
+            formatLabel = if (aspectRatio == "16:9") "Horizontal (16:9)" else "Vertical (9:16)",
+            aspectRatio = aspectRatio,
+            durationSeconds = durationSeconds,
+            durationLabel = "${durationSeconds}\"",
+            basePrompt = basePrompt.trim(),
+            recommendedEngine = recommendedEngine,
+            stylePreset = stylePreset,
+            priceFcfa = priceFcfa,
+            creatorName = creatorName,
+            creatorId = creatorId
+        )
+
+        // Sauvegarde distante dans Supabase video_templates
+        try {
+            val payload = JSONObject().apply {
+                put("id", newTemplate.id)
+                put("title", newTemplate.title)
+                put("description", newTemplate.description)
+                put("category", newTemplate.category)
+                put("prompt_template", newTemplate.basePrompt)
+                put("style_preset", newTemplate.stylePreset)
+                put("duration_seconds", newTemplate.durationSeconds)
+                put("aspect_ratio", newTemplate.aspectRatio)
+                put("price_fcfa", priceFcfa)
+                put("creator_name", creatorName)
+                put("author_id", creatorId)
+            }
+            client.execute(
+                endpoint = "/rest/v1/video_templates",
+                method = "POST",
+                jsonBody = payload.toString()
+            )
+        } catch (_: Exception) {}
+
+        _creatorTemplates.value = listOf(newTemplate) + _creatorTemplates.value
+        triggerRealtimeNotification(
+            title = "Template mis en vente !",
+            message = "Votre template « ${newTemplate.title} » est disponible sur la marketplace PANU (${if (priceFcfa > 0) "$priceFcfa FCFA" else "Gratuit"}).",
+            type = "order"
+        )
+        Result.success(newTemplate)
+    }
+
+    /**
+     * Publie une offre de service freelance créatif (Réalisation, Montage, Voix Off).
+     */
+    suspend fun publishCreatorService(
+        title: String,
+        category: String,
+        description: String,
+        priceFcfa: Int,
+        turnaroundDays: Int,
+        contactWhatsapp: String
+    ): Result<com.example.data.model.CreatorServiceOffer> = withContext(Dispatchers.IO) {
+        val creatorId = sessionManager.currentUserId.value ?: "creator_${System.currentTimeMillis()}"
+        val creatorName = sessionManager.currentUserEmail.value?.substringBefore("@") ?: "Créateur Pro PANU"
+        val offer = com.example.data.model.CreatorServiceOffer(
+            id = "srv_${UUID.randomUUID().toString().take(8)}",
+            creatorId = creatorId,
+            creatorName = creatorName,
+            title = title.trim(),
+            category = category,
+            description = description.trim(),
+            priceFcfa = priceFcfa,
+            turnaroundDays = turnaroundDays,
+            contactWhatsapp = contactWhatsapp.trim()
+        )
+        _creatorServices.value = listOf(offer) + _creatorServices.value
+        triggerRealtimeNotification(
+            title = "Service créatif publié !",
+            message = "Votre prestation « ${offer.title} » ($priceFcfa FCFA) est active sur PANU Studio.",
+            type = "order"
+        )
+        Result.success(offer)
+    }
+
+    /**
+     * Rémunère le créateur d'un template lorsqu'un utilisateur l'utilise.
+     */
+    fun recordTemplateUseReward(template: PanuTemplate) {
+        if (template.priceFcfa > 0) {
+            val commission = (template.priceFcfa * 0.70).toInt()
+            val current = _creatorEarnings.value
+            _creatorEarnings.value = current.copy(
+                totalAvailableFcfa = current.totalAvailableFcfa + commission,
+                creatorFundShareFcfa = current.creatorFundShareFcfa + commission
+            )
+            CoroutineScope(Dispatchers.IO).launch {
+                triggerRealtimeNotification(
+                    title = "💰 Vente de Template (+${commission} FCFA)",
+                    message = "Votre template « ${template.title} » a été utilisé ! Vos gains ont été crédités sur votre Fonds Créateur.",
+                    type = "gift"
+                )
+            }
         }
     }
 

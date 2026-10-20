@@ -10,7 +10,7 @@ class SupabasePostService(private val client: SupabaseClient) {
 
     suspend fun getPublishedPosts(): Result<List<Post>> = withContext(Dispatchers.IO) {
         // Query posts with author profiles joined or select fields
-        val endpoint = "/rest/v1/posts?status=eq.published&visibility=eq.public&order=created_at.desc&select=id,author_id,title,content,media_url,media_type,status,visibility,created_at,updated_at,profiles(full_name,username,avatar_url)"
+        val endpoint = "/rest/v1/posts?status=eq.published&visibility=eq.public&order=created_at.desc&select=id,author_id,title,content,media_url,media_type,status,visibility,likes_count,created_at,updated_at,profiles(full_name,username,avatar_url)"
         when (val response = client.execute(endpoint)) {
             is SupabaseResponse.Success -> {
                 val array = response.asJsonArray() ?: JSONArray()
@@ -117,6 +117,18 @@ class SupabasePostService(private val client: SupabaseClient) {
         }
     }
 
+    suspend fun updateLikesCount(postId: String, newCount: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        val payload = JSONObject().apply {
+            put("likes_count", newCount)
+        }
+        val endpoint = "/rest/v1/posts?id=eq.$postId"
+        when (val response = client.execute(endpoint, method = "PATCH", jsonBody = payload.toString())) {
+            is SupabaseResponse.Success -> Result.success(Unit)
+            is SupabaseResponse.Error -> Result.failure(Exception(response.message))
+            is SupabaseResponse.NetworkError -> Result.failure(Exception(response.message))
+        }
+    }
+
     private fun parsePost(obj: JSONObject): Post {
         val profilesObj = obj.optJSONObject("profiles")
         return Post(
@@ -131,6 +143,7 @@ class SupabasePostService(private val client: SupabaseClient) {
             mediaType = obj.optString("media_type", "none"),
             status = obj.optString("status", "draft"),
             visibility = obj.optString("visibility", "public"),
+            likesCount = obj.optInt("likes_count", 0),
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )

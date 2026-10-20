@@ -38,6 +38,9 @@ import com.example.data.repository.GeminiRepository
 import com.example.data.repository.ai.CreativeMediaService
 import com.example.data.repository.ai.VideoSequenceSegment
 import com.example.ui.components.PanuMediaPlayer
+import com.example.ui.components.PanuWatermarkExporterDialog
+import com.example.ui.util.MediaDownloadManager
+import com.example.ui.util.PanuMediaConstants
 import kotlinx.coroutines.launch
 
 // Modèle de série / film / documentaire PANU
@@ -145,13 +148,18 @@ fun SeriesGeneratorScreen(
 
     var isGeneratingMedia by remember { mutableStateOf(false) }
     var generationProgressText by remember { mutableStateOf<String?>(null) }
-    var generatedVideoUrl by remember { mutableStateOf("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") }
+    var generatedVideoUrl by remember { mutableStateOf(PanuMediaConstants.DEFAULT_FALLBACK_VIDEO) }
     var generatedSegments by remember { mutableStateOf<List<VideoSequenceSegment>>(emptyList()) }
     var hasGeneratedMedia by remember { mutableStateOf(false) }
 
     var activeExercise by remember { mutableStateOf<AcademyExercise?>(null) }
     var exerciseAnswer by remember { mutableStateOf("") }
     var exerciseFeedback by remember { mutableStateOf<String?>(null) }
+
+    val customScenarios = remember { mutableStateListOf<SeriesTemplate>() }
+    var showCreateScenarioDialog by remember { mutableStateOf(false) }
+    var customizingScenario by remember { mutableStateOf<SeriesTemplate?>(null) }
+    var showWatermarkExporter by remember { mutableStateOf(false) }
 
     fun triggerMediaGeneration(
         targetPrompt: String,
@@ -341,7 +349,12 @@ fun SeriesGeneratorScreen(
                 }
                 1 -> {
                     TemplatesTab(
+                        customScenarios = customScenarios,
+                        onAddNewScenario = { showCreateScenarioDialog = true },
                         onSelectTemplate = { t ->
+                            customizingScenario = t
+                        },
+                        onQuickUse = { t ->
                             title = t.title
                             selectedGenre = t.genre
                             visualStyle = t.visualStyle
@@ -349,9 +362,8 @@ fun SeriesGeneratorScreen(
                             character = t.character
                             generatedVideoUrl = t.previewVideoUrl
                             selectedTab = 0
-                            // Déclenchement automatique de la génération média en arrière-plan sans afficher de bloc texte
                             triggerMediaGeneration(
-                                targetPrompt = t.visualStyle,
+                                targetPrompt = "${t.visualStyle}. Thème : ${t.universe}. Narration : ${t.character}",
                                 targetTitle = t.title,
                                 targetGenre = t.genre,
                                 targetDuration = selectedDuration
@@ -380,11 +392,198 @@ fun SeriesGeneratorScreen(
                                 return@AcademyTab
                             }
                             exerciseFeedback = "✅ Excellent travail ! Votre proposition respecte la structure '${exercise.title}' avec format prêt à tourner."
+                        },
+                        onApplyToDirector = { conceptPrompt ->
+                            val currentEx = activeExercise
+                            universe = conceptPrompt
+                            visualStyle = "Plans cinématiques 8K, ${currentEx?.formula ?: "structure en 3 scènes"}, éclairage professionnel"
+                            title = currentEx?.title ?: "Création Académie PANU"
+                            selectedTab = 0
+                            Toast.makeText(context, "🎬 Concept chargé dans le Réalisateur 8K !", Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
             }
         }
+    }
+
+    // Modal de Personnalisation & Lancement d'un Univers / Scénario
+    customizingScenario?.let { scenario ->
+        var editTitle by remember(scenario) { mutableStateOf(scenario.title) }
+        var editGenre by remember(scenario) { mutableStateOf(scenario.genre) }
+        var editUniverse by remember(scenario) { mutableStateOf(scenario.universe) }
+        var editCharacter by remember(scenario) { mutableStateOf(scenario.character) }
+        var editDuration by remember(scenario) { mutableStateOf(selectedDuration) }
+
+        AlertDialog(
+            onDismissRequest = { customizingScenario = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(scenario.icon, fontSize = 22.sp)
+                    Text("Personnaliser le Scénario", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Titre de la création") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editUniverse,
+                        onValueChange = { editUniverse = it },
+                        label = { Text("Décor & Univers visuel") },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editCharacter,
+                        onValueChange = { editCharacter = it },
+                        label = { Text("Sujet & Narration / Personnage") },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Durée souhaitée :", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        CreativeMediaService.SUPPORTED_DURATIONS.forEach { dur ->
+                            FilterChip(
+                                selected = editDuration == dur,
+                                onClick = { editDuration = dur },
+                                label = { Text(dur, fontSize = 10.sp) }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val chosen = scenario.copy(
+                            title = editTitle,
+                            genre = editGenre,
+                            universe = editUniverse,
+                            character = editCharacter
+                        )
+                        title = chosen.title
+                        selectedGenre = chosen.genre
+                        universe = chosen.universe
+                        character = chosen.character
+                        selectedDuration = editDuration
+                        customizingScenario = null
+                        selectedTab = 0
+                        triggerMediaGeneration(
+                            targetPrompt = "${chosen.visualStyle}. Thème : ${chosen.universe}. Narration : ${chosen.character}",
+                            targetTitle = chosen.title,
+                            targetGenre = chosen.genre,
+                            targetDuration = editDuration
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5A93C))
+                ) {
+                    Text("Lancer la Production ($editDuration)", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { customizingScenario = null }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
+    // Modal de Création d'un Nouvel Univers Personnalisé
+    if (showCreateScenarioDialog) {
+        var newTitle by remember { mutableStateOf("") }
+        var newGenre by remember { mutableStateOf("Documentaire 8K") }
+        var newUniverse by remember { mutableStateOf("") }
+        var newCharacter by remember { mutableStateOf("") }
+        var newIcon by remember { mutableStateOf("🌟") }
+
+        AlertDialog(
+            onDismissRequest = { showCreateScenarioDialog = false },
+            title = { Text("✨ Créer un Univers / Scénario", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newTitle,
+                        onValueChange = { newTitle = it },
+                        label = { Text("Titre du Scénario") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newGenre,
+                        onValueChange = { newGenre = it },
+                        label = { Text("Genre (Film, Série, Documentaire, Clip)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newUniverse,
+                        onValueChange = { newUniverse = it },
+                        label = { Text("Décor & Ambiance de l'Univers") },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newCharacter,
+                        onValueChange = { newCharacter = it },
+                        label = { Text("Personnages & Voix Off") },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newTitle.isNotBlank()) {
+                            val created = SeriesTemplate(
+                                title = newTitle.trim(),
+                                genre = newGenre.trim(),
+                                visualStyle = "Plans cinématiques 8K, éclairage dynamique, rendu photoréaliste",
+                                universe = newUniverse.trim(),
+                                character = newCharacter.trim(),
+                                icon = newIcon
+                            )
+                            customScenarios.add(created)
+                            showCreateScenarioDialog = false
+                            Toast.makeText(context, "Univers « $newTitle » ajouté à vos scénarios !", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = newTitle.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5A93C))
+                ) {
+                    Text("Ajouter l'Univers", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateScenarioDialog = false }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
+    if (showWatermarkExporter) {
+        PanuWatermarkExporterDialog(
+            isOpen = true,
+            authorHandle = "@createur_panu",
+            contentTitle = title,
+            onDismiss = { showWatermarkExporter = false }
+        )
     }
 }
 
@@ -435,16 +634,60 @@ private fun SeriesCreationTab(
             durationLabel = selectedDuration,
             isVideo = true,
             onDownload = {
-                Toast.makeText(context, "📥 Téléchargement de « $title.mp4 » lancé !", Toast.LENGTH_SHORT).show()
+                MediaDownloadManager.downloadMedia(
+                    context = context,
+                    url = generatedVideoUrl,
+                    title = title,
+                    mediaType = MediaDownloadManager.MediaType.VIDEO
+                )
             },
             onShare = {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, "🎬 Regardez « $title » ($selectedDuration) généré sur PANU Studio : $generatedVideoUrl")
-                }
-                context.startActivity(Intent.createChooser(intent, "Partager la vidéo"))
+                MediaDownloadManager.shareMedia(
+                    context = context,
+                    url = generatedVideoUrl,
+                    title = title,
+                    description = "🎬 Création PANU Studio 8K : $selectedGenre ($selectedDuration)"
+                )
             }
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    MediaDownloadManager.downloadMedia(
+                        context = context,
+                        url = generatedVideoUrl,
+                        title = title,
+                        mediaType = MediaDownloadManager.MediaType.VIDEO
+                    )
+                },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Télécharger MP4", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                onClick = {
+                    MediaDownloadManager.shareMedia(
+                        context = context,
+                        url = generatedVideoUrl,
+                        title = title,
+                        description = "🎬 Création PANU Studio 8K : $selectedGenre ($selectedDuration)"
+                    )
+                },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Partager", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
 
         // 2. GESTION DES DURÉES ET FORMATS (5", 10", 19", 30", 1', 10')
         Card(
@@ -647,7 +890,8 @@ private fun AcademyTab(
     userAnswer: String,
     onAnswerChange: (String) -> Unit,
     feedback: String?,
-    onSubmitAnswer: (AcademyExercise) -> Unit
+    onSubmitAnswer: (AcademyExercise) -> Unit,
+    onApplyToDirector: (String) -> Unit = {}
 ) {
     if (activeExercise != null) {
         Column(
@@ -686,7 +930,8 @@ private fun AcademyTab(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("💡 Conseils de Réalisation :", fontWeight = FontWeight.Bold)
+                    Text("💡 Structure & Conseils de Réalisation :", fontWeight = FontWeight.Bold)
+                    Text("Formule : ${activeExercise.formula}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFE5A93C), fontWeight = FontWeight.Bold)
                     activeExercise.proTips.forEach { tip ->
                         Text("• $tip", style = MaterialTheme.typography.bodySmall)
                     }
@@ -697,19 +942,50 @@ private fun AcademyTab(
                 value = userAnswer,
                 onValueChange = onAnswerChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Votre proposition") },
+                label = { Text("Votre concept / proposition") },
+                placeholder = { Text(activeExercise.challengePrompt, fontSize = 12.sp) },
                 minLines = 4
             )
 
-            Button(
-                onClick = { onSubmitAnswer(activeExercise) },
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Valider l'exercice")
+                Button(
+                    onClick = { onSubmitAnswer(activeExercise) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Valider l'exercice")
+                }
+
+                Button(
+                    onClick = {
+                        onApplyToDirector(userAnswer.ifBlank { activeExercise.challengePrompt })
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5A93C)),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(Icons.Default.MovieFilter, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Tester dans Réalisateur 8K", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
             }
 
             if (feedback != null) {
-                Text(feedback, color = Color(0xFF2ED573), fontWeight = FontWeight.Bold)
+                Surface(
+                    color = Color(0xFF2ED573).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2ED573)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = feedback,
+                        color = Color(0xFF2ED573),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
         }
     } else {
@@ -753,29 +1029,53 @@ private fun AcademyTab(
 
 @Composable
 private fun TemplatesTab(
-    onSelectTemplate: (SeriesTemplate) -> Unit
+    customScenarios: List<SeriesTemplate> = emptyList(),
+    onAddNewScenario: () -> Unit = {},
+    onSelectTemplate: (SeriesTemplate) -> Unit,
+    onQuickUse: (SeriesTemplate) -> Unit = onSelectTemplate
 ) {
+    val allTemplates = remember(customScenarios) {
+        customScenarios + TRENDING_TEMPLATES
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         item {
-            Text(
-                text = "Univers & Scénarios Prédéfinis PANU",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Sélectionnez un univers pour charger sa structure et lancer sa génération.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Univers & Scénarios Prédéfinis PANU",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Sélectionnez un univers pour charger sa structure et lancer sa génération.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                OutlinedButton(
+                    onClick = onAddNewScenario,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Nouveau", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
-        items(TRENDING_TEMPLATES) { template ->
+        items(allTemplates) { template ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -803,12 +1103,22 @@ private fun TemplatesTab(
                                 Text(template.genre, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        Button(
-                            onClick = { onSelectTemplate(template) },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("Utiliser", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { onSelectTemplate(template) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text("Personnaliser", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = { onQuickUse(template) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5A93C)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Utiliser", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
                         }
                     }
 

@@ -102,6 +102,7 @@ import com.example.ui.components.MobileMoneyCreditsStoreDialog
 import com.example.ui.components.NotificationsCenterDialog
 import com.example.ui.components.PanuAvatar
 import com.example.ui.components.PanuBottomNav
+import com.example.ui.components.PanuMediaPlayer
 import com.example.ui.components.PanuTopBar
 import com.example.ui.components.TikTokInVideoAdSlide
 import com.example.ui.components.VisibilityBoosterDialog
@@ -606,7 +607,7 @@ fun HomeScreen(
                             )
                         } else {
                             val isLiked = likedPosts[post.id] ?: false
-                            val currentLikes = likesCount[post.id] ?: ((post.id.hashCode() % 180) + 125).coerceAtLeast(42)
+                            val currentLikes = likesCount[post.id] ?: post.likesCount
 
                             TikTokVerticalVideoItem(
                                 post = post,
@@ -625,10 +626,20 @@ fun HomeScreen(
                                 },
                             onLikeClick = {
                                 handleInteractionGated("aimer cette vidéo") {
-                                    val next = !isLiked
-                                    likedPosts[post.id] = next
-                                    likesCount[post.id] = if (next) currentLikes + 1 else currentLikes - 1
-                                    Toast.makeText(context, if (next) "❤️ J'aime ajouté" else "Mention retirée", Toast.LENGTH_SHORT).show()
+                                    scope.launch {
+                                        val next = !isLiked
+                                        likedPosts[post.id] = next
+                                        val updatedLikes = if (next) currentLikes + 1 else (currentLikes - 1).coerceAtLeast(0)
+                                        likesCount[post.id] = updatedLikes
+                                        val res = postRepository.updateLikes(post.id, updatedLikes)
+                                        if (res.isSuccess) {
+                                            Toast.makeText(context, if (next) "❤️ J'aime ajouté" else "Mention retirée", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            likedPosts[post.id] = isLiked
+                                            likesCount[post.id] = currentLikes
+                                            Toast.makeText(context, "Erreur de connexion lors de l'enregistrement du J'aime", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             },
                             onCommentClick = {
@@ -758,7 +769,7 @@ fun HomeScreen(
 
                 items(displayedPosts, key = { it.id }) { post ->
                         val isLiked = likedPosts[post.id] ?: false
-                        val currentCount = likesCount[post.id] ?: ((post.id.hashCode() % 40) + 24).coerceAtLeast(10)
+                        val currentCount = likesCount[post.id] ?: post.likesCount
 
                         PostCard(
                             post = post,
@@ -774,9 +785,20 @@ fun HomeScreen(
                             },
                             onLikeClick = {
                                 handleInteractionGated("aimer") {
-                                    val newStatus = !isLiked
-                                    likedPosts[post.id] = newStatus
-                                    likesCount[post.id] = if (newStatus) currentCount + 1 else (currentCount - 1).coerceAtLeast(0)
+                                    scope.launch {
+                                        val newStatus = !isLiked
+                                        likedPosts[post.id] = newStatus
+                                        val updatedCount = if (newStatus) currentCount + 1 else (currentCount - 1).coerceAtLeast(0)
+                                        likesCount[post.id] = updatedCount
+                                        val res = postRepository.updateLikes(post.id, updatedCount)
+                                        if (res.isSuccess) {
+                                            Toast.makeText(context, if (newStatus) "❤️ J'aime ajouté" else "Mention retirée", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            likedPosts[post.id] = isLiked
+                                            likesCount[post.id] = currentCount
+                                            Toast.makeText(context, "Erreur de connexion lors de l'enregistrement du J'aime", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 }
                             },
                             onCommentClick = {
@@ -1062,7 +1084,7 @@ private fun TikTokActionSideButton(
 fun PostCard(
     post: Post,
     isLiked: Boolean = false,
-    likesCount: Int = 14,
+    likesCount: Int = post.likesCount,
     onAuthorClick: () -> Unit,
     onVideoClick: (String) -> Unit = {},
     onLikeClick: () -> Unit = {},
@@ -1149,22 +1171,13 @@ fun PostCard(
 
             if (!post.mediaUrl.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(colors.surfaceElevated)
-                        .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp))
-                        .clickable { onVideoClick(post.mediaUrl) }
-                ) {
-                    AsyncImage(
-                        model = post.mediaUrl,
-                        contentDescription = "Média de la publication",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                PanuMediaPlayer(
+                    mediaUrl = post.mediaUrl,
+                    title = post.title ?: "Publication PANU",
+                    mediaType = post.mediaType,
+                    isVideo = post.mediaType.equals("video", ignoreCase = true),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -5,20 +5,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Surface
-import androidx.compose.material3.rememberDrawerState
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodel.AuthViewModel
 import com.example.ui.viewmodel.VodViewModel
 import androidx.compose.ui.Modifier
@@ -188,11 +190,44 @@ fun PanuAppNavHost(container: PanuAppContainer) {
             )
         }
     ) {
+        val isOnline by container.networkMonitor.isOnline.collectAsState()
+
         Box(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = startDestination
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                AnimatedVisibility(visible = !isOnline) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFFD35400)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.CloudOff,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Mode hors-ligne • Données locales préservées",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = startDestination
+                    ) {
             // --- Authentication ---
             composable(PanuScreen.Login.route) {
                 LoginScreen(
@@ -337,7 +372,7 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 arguments = listOf(navArgument("url") { type = NavType.StringType })
             ) { backStackEntry ->
                 val url = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("url") ?: "", "UTF-8")
-                VideoPlayerScreen(videoUrl = url)
+                VideoPlayerScreen(videoUrl = url, onNavigateBack = { navController.popBackStack() })
             }
             composable(PanuScreen.LiveSports.route) {
                 LiveSportsScreen(
@@ -589,6 +624,8 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 )
             }
             }
+            } // Close Box(modifier = Modifier.weight(1f))
+            } // Close Column
 
             // 🔔 Bannière de notification en temps réel (Supabase Realtime)
             RealtimeNotificationBanner(

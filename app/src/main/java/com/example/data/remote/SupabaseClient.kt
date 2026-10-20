@@ -34,9 +34,9 @@ class SupabaseClient(private val sessionManager: SessionManager) {
         )
         .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
         .retryOnConnectionFailure(true)
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -54,15 +54,38 @@ class SupabaseClient(private val sessionManager: SessionManager) {
             try {
                 if (isConfigured) {
                     val req = Request.Builder()
-                        .url("$currentUrl/rest/v1/")
-                        .head()
+                        .url("$currentUrl/auth/v1/health")
+                        .get()
                         .addHeader("apikey", currentAnonKey)
+                        .addHeader("Authorization", "Bearer $currentAnonKey")
                         .build()
                     httpClient.newCall(req).execute().close()
                 }
             } catch (_: Exception) {
                 // Ignoré silencieusement en mode hors-ligne
             }
+        }
+    }
+
+    /**
+     * Vérification directe de l'état de la connexion au serveur Supabase.
+     * Interroge l'endpoint public /auth/v1/health qui renvoie 200 avec la clé anon.
+     */
+    suspend fun checkConnection(): Boolean = withContext(Dispatchers.IO) {
+        if (!isConfigured) return@withContext false
+        try {
+            val req = Request.Builder()
+                .url("$currentUrl/auth/v1/health")
+                .get()
+                .addHeader("apikey", currentAnonKey)
+                .addHeader("Authorization", "Bearer $currentAnonKey")
+                .build()
+            val resp = httpClient.newCall(req).execute()
+            val success = resp.isSuccessful
+            resp.close()
+            success
+        } catch (_: Exception) {
+            false
         }
     }
 

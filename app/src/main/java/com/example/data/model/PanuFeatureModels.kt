@@ -106,10 +106,27 @@ data class PanuTemplate(
     val musicTrack: String? = null,
     val transitionEffect: String = "Fondu enchaîné cinématique",
     val animationEffect: String = "Zoom dynamique",
-    val visualFilter: String = "Contraste chaud & Or",
     val basePrompt: String = "",
     val recommendedEngine: String = "MiniMax/Hailuo", // MiniMax/Hailuo, Kling, Luma, Flux/BFL
-    val stylePreset: String = "Cinématographique"
+    val stylePreset: String = "Cinématographique",
+    val priceFcfa: Int = 0,
+    val creatorName: String? = null,
+    val creatorId: String? = null,
+    val salesCount: Int = 0
+)
+
+data class CreatorServiceOffer(
+    val id: String,
+    val creatorId: String,
+    val creatorName: String,
+    val title: String, // ex: "Réalisation Spot Publicitaire 8K"
+    val category: String, // "Vidéo 8K", "Publicité", "Montage", "Voix Off", "Scénario"
+    val description: String,
+    val priceFcfa: Int,
+    val turnaroundDays: Int = 2,
+    val contactWhatsapp: String = "",
+    val rating: Double = 4.9,
+    val completedOrders: Int = 0
 )
 
 data class ViralVideoTemplate(

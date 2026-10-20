@@ -8,7 +8,14 @@ import com.example.data.remote.Part
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class GeminiRepository(private val apiService: GeminiApiService, private val apiKey: String) {
+class GeminiRepository(
+    private val apiService: GeminiApiService,
+    private val apiKey: String = "",
+    private val apiKeyProvider: (() -> String)? = null
+) {
+
+    private val resolvedApiKey: String
+        get() = apiKeyProvider?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
 
     companion object {
         /**
@@ -39,10 +46,10 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
             $concept
         """.trimIndent()
 
-        if (apiKey.isNotBlank()) {
+        if (resolvedApiKey.isNotBlank()) {
             try {
                 val request = ContentRequest(listOf(Content(listOf(Part(fullPrompt)))))
-                val response = apiService.generateContent(apiKey, request)
+                val response = apiService.generateContent(resolvedApiKey, request)
                 val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 if (!text.isNullOrBlank()) {
                     return@withContext text

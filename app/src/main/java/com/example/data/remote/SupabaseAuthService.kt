@@ -505,6 +505,19 @@ class SupabaseAuthService(
         Result.success(AuthResult(uid, syntheticEmail, null, "user"))
     }
 
+    suspend fun sendPasswordResetEmail(email: String): Result<String> = withContext(Dispatchers.IO) {
+        val cleanEmail = email.trim().lowercase()
+        val payload = JSONObject().apply {
+            put("email", cleanEmail)
+        }
+        val response = client.execute(endpoint = "/auth/v1/recover", method = "POST", jsonBody = payload.toString())
+        when (response) {
+            is SupabaseResponse.Success -> Result.success("Un email contenant le lien de réinitialisation sécurisé a été envoyé à $cleanEmail.")
+            is SupabaseResponse.Error -> Result.failure(Exception(translateAuthError(response.message)))
+            is SupabaseResponse.NetworkError -> Result.failure(Exception(translateAuthError(response.message)))
+        }
+    }
+
     suspend fun signOut(): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {

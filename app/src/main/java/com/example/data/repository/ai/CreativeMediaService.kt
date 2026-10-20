@@ -1,6 +1,7 @@
 package com.example.data.repository.ai
 
 import com.example.data.local.SessionManager
+import com.example.ui.util.PanuMediaConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -433,12 +434,7 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                     }
                     val aiRes = geminiProvider.generateCreativeContent(AICreativeCategory.VIDEO, fullPrompt, emptyMap())
                     if (aiRes.isSuccess) {
-                        val sampleVideos = listOf(
-                            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-                        )
-                        Pair(sampleVideos.random(), "")
+                        Pair(PanuMediaConstants.RELIABLE_VIDEO_STREAMS.random(), "")
                     } else {
                         throw Exception(aiRes.exceptionOrNull()?.message ?: "Erreur Google Gemini AI")
                     }
@@ -447,11 +443,7 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                     val key = sessionManager.getLumaApiKey()
                     if (key.isBlank() || key.startsWith("YOUR_")) {
                         if (geminiProvider.isConnected) {
-                            val sampleVideos = listOf(
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
-                            )
-                            return@withContext Pair(sampleVideos.random(), "")
+                            return@withContext Pair(PanuMediaConstants.RELIABLE_VIDEO_STREAMS.random(), "")
                         }
                         throw Exception("Clé API Luma non configurée.")
                     }
@@ -461,11 +453,7 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                     val key = sessionManager.getMiniMaxApiKey()
                     if (key.isBlank() || key.startsWith("YOUR_")) {
                         if (geminiProvider.isConnected) {
-                            val sampleVideos = listOf(
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-                            )
-                            return@withContext Pair(sampleVideos.random(), "")
+                            return@withContext Pair(PanuMediaConstants.RELIABLE_VIDEO_STREAMS.random(), "")
                         }
                         throw Exception("Clé API MiniMax non configurée.")
                     }
@@ -486,11 +474,7 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                     val key = sessionManager.getFalApiKey()
                     if (key.isBlank() || key.startsWith("YOUR_")) {
                         if (geminiProvider.isConnected) {
-                            val sampleVideos = listOf(
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
-                            )
-                            return@withContext Pair(sampleVideos.random(), "")
+                            return@withContext Pair(PanuMediaConstants.RELIABLE_VIDEO_STREAMS.random(), "")
                         }
                         throw Exception("Clé API Kling/Fal.ai non configurée.")
                     }
@@ -500,12 +484,7 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
         } catch (e: Exception) {
             // Graceful fallback to Gemini / sample media on 403 / failure
             if (geminiProvider.isConnected) {
-                val sampleVideos = listOf(
-                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-                )
-                Pair(sampleVideos.random(), "")
+                Pair(PanuMediaConstants.RELIABLE_VIDEO_STREAMS.random(), "")
             } else {
                 throw e
             }

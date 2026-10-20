@@ -80,6 +80,9 @@ import com.example.ui.components.PanuBottomNav
 import com.example.ui.components.PanuEmptyState
 import com.example.ui.components.PanuMediaPlayer
 import com.example.ui.components.PanuTopBar
+import com.example.ui.components.PanuWatermarkExporterDialog
+import com.example.ui.util.MediaDownloadManager
+import com.example.ui.util.PanuMediaConstants
 import com.example.ui.navigation.PanuScreen
 import com.example.ui.theme.PanuChampagne
 import com.example.ui.theme.PanuGold
@@ -130,6 +133,7 @@ fun ActivityScreen(
     var selectedCanvasProjectForPreview by remember { mutableStateOf<CanvasProject?>(null) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
+    var watermarkProjectTitle by remember { mutableStateOf<String?>(null) }
     var operationError by remember { mutableStateOf<String?>(null) }
     var operationSuccess by remember { mutableStateOf<String?>(null) }
     var isOperating by remember { mutableStateOf(false) }
@@ -296,12 +300,33 @@ fun ActivityScreen(
                                 )
                             }
                             "video" -> {
+                                val context = androidx.compose.ui.platform.LocalContext.current
                                 PanuMediaPlayer(
-                                    mediaUrl = preview.mediaUrl ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                                    mediaUrl = preview.mediaUrl ?: PanuMediaConstants.DEFAULT_FALLBACK_VIDEO,
                                     thumbnailUrl = "",
                                     title = preview.title ?: "Création Vidéo PANU",
                                     durationLabel = "HD",
                                     isVideo = true,
+                                    onDownload = {
+                                        preview.mediaUrl?.let { url ->
+                                            MediaDownloadManager.downloadMedia(
+                                                context = context,
+                                                url = url,
+                                                title = preview.title ?: "creation_panu",
+                                                mediaType = MediaDownloadManager.MediaType.VIDEO
+                                            )
+                                        }
+                                    },
+                                    onShare = {
+                                        preview.mediaUrl?.let { url ->
+                                            MediaDownloadManager.shareMedia(
+                                                context = context,
+                                                url = url,
+                                                title = preview.title ?: "Création PANU",
+                                                description = preview.content
+                                            )
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -382,16 +407,56 @@ fun ActivityScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    val mediaUrl = proj.previewUrl ?: proj.layers.firstOrNull { it.type == com.example.data.model.CanvasLayerType.IMAGE }?.content ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                    val mediaUrl = proj.previewUrl ?: proj.layers.firstOrNull { it.type == com.example.data.model.CanvasLayerType.IMAGE }?.content ?: PanuMediaConstants.DEFAULT_FALLBACK_VIDEO
                     PanuMediaPlayer(
                         mediaUrl = mediaUrl,
                         title = proj.title,
                         durationLabel = "Projet Studio",
                         isVideo = proj.exportFormat == "MP4",
                         onDownload = {
-                            android.widget.Toast.makeText(context, "📥 Projet « ${proj.title} » téléchargé !", android.widget.Toast.LENGTH_SHORT).show()
+                            MediaDownloadManager.downloadMedia(
+                                context = context,
+                                url = mediaUrl,
+                                title = proj.title,
+                                mediaType = if (proj.exportFormat == "MP4") MediaDownloadManager.MediaType.VIDEO else MediaDownloadManager.MediaType.IMAGE
+                            )
+                        },
+                        onShare = {
+                            MediaDownloadManager.shareMedia(
+                                context = context,
+                                url = mediaUrl,
+                                title = proj.title,
+                                description = "🎬 Projet PANU Studio : ${proj.title} (${proj.exportFormat})"
+                            )
                         }
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                MediaDownloadManager.downloadMedia(
+                                    context = context,
+                                    url = mediaUrl,
+                                    title = proj.title,
+                                    mediaType = if (proj.exportFormat == "MP4") MediaDownloadManager.MediaType.VIDEO else MediaDownloadManager.MediaType.IMAGE
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("📥 Télécharger", color = PanuGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = {
+                                watermarkProjectTitle = proj.title
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = PanuGold),
+                            modifier = Modifier.weight(1.3f)
+                        ) {
+                            Text("Filigrane & Export", color = androidx.compose.ui.graphics.Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
                     Text(
                         text = "Format d'export : ${proj.exportFormat} • Enregistré dans Supabase canvas_projects",
                         style = MaterialTheme.typography.bodySmall,
@@ -407,6 +472,15 @@ fun ActivityScreen(
             containerColor = PanuSurfaceDark,
             titleContentColor = PanuTextPrimaryDark,
             textContentColor = PanuTextSecondaryDark
+        )
+    }
+
+    if (watermarkProjectTitle != null) {
+        PanuWatermarkExporterDialog(
+            isOpen = true,
+            authorHandle = sessionManager.currentUserEmail.value?.substringBefore("@") ?: "@createur_panu",
+            contentTitle = watermarkProjectTitle ?: "Création PANU",
+            onDismiss = { watermarkProjectTitle = null }
         )
     }
 

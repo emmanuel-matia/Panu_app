@@ -29,6 +29,7 @@ import com.example.data.repository.ai.AIProvider
 import com.example.data.repository.ai.CreativeMediaService
 import com.example.data.repository.ai.GeminiAIProvider
 import com.example.data.repository.ai.GroundingService
+import com.example.ui.util.NetworkConnectivityMonitor
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -137,10 +138,13 @@ class PanuAppContainer(context: Context) {
         )
     }
 
+    val networkMonitor: NetworkConnectivityMonitor by lazy { NetworkConnectivityMonitor(appCtx) }
+
     val geminiRepository: GeminiRepository by lazy {
         GeminiRepository(
             apiService = RetrofitClient.geminiService,
-            apiKey = BuildConfig.GEMINI_API_KEY
+            apiKey = BuildConfig.GEMINI_API_KEY,
+            apiKeyProvider = { sessionManager.getGeminiApiKey() }
         )
     }
 

@@ -18,6 +18,7 @@ data class Post(
     val mediaType: String = "none", // none, image, video
     val status: String = "draft",   // draft, published, archived
     val visibility: String = "public", // public, private
+    val likesCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

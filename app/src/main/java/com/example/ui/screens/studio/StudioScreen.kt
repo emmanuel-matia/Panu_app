@@ -120,9 +120,11 @@ import com.example.ui.components.MobileMoneyCreditsStoreDialog
 import com.example.ui.components.PanuBottomNav
 import com.example.ui.components.PanuMediaPlayer
 import com.example.ui.components.PanuTopBar
+import com.example.ui.components.PanuWatermarkExporterDialog
 import com.example.ui.components.VisibilityBoosterDialog
 import com.example.ui.navigation.PanuScreen
 import com.example.ui.theme.PanuTheme
+import com.example.ui.util.MediaDownloadManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -145,6 +147,7 @@ fun StudioScreen(
     // 0: Studio Vidéo PANU, 1: Templates PANU, 2: Création Graphique PANU, 3: Films & Séries IA
 
     var selectedTemplateForCustomization by remember { mutableStateOf<PanuTemplate?>(null) }
+    var activeEditorProject by remember { mutableStateOf<StudioProject?>(null) }
 
     Scaffold(
         topBar = {
@@ -210,17 +213,10 @@ fun StudioScreen(
                         icon = { Icon(Icons.Default.ViewModule, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         modifier = Modifier.testTag("tab_templates_panu")
                     )
-                    Tab(
-                        selected = selectedStudioTab == 2,
-                        onClick = { selectedStudioTab = 2 },
-                        text = { Text("🎨 Création IA PANU", fontWeight = FontWeight.Bold) },
-                        icon = { Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                        modifier = Modifier.testTag("tab_graphic_studio")
-                    )
                     if (geminiRepository != null) {
                         Tab(
-                            selected = selectedStudioTab == 3,
-                            onClick = { selectedStudioTab = 3 },
+                            selected = selectedStudioTab == 2,
+                            onClick = { selectedStudioTab = 2 },
                             text = { Text("📽️ Films & Séries IA", fontWeight = FontWeight.Bold) },
                             icon = { Icon(Icons.Default.MovieFilter, contentDescription = null, modifier = Modifier.size(18.dp)) },
                             modifier = Modifier.testTag("tab_series_studio")
@@ -257,8 +253,7 @@ fun StudioScreen(
                     },
                     onCreateWithAi = { selectedStudioTab = 0 }
                 )
-                2 -> PanuGraphicStudioTab(featuresService = featuresService)
-                3 -> {
+                2 -> {
                     if (geminiRepository != null) {
                         SeriesGeneratorScreen(
                             repository = geminiRepository,
@@ -276,9 +271,9 @@ fun StudioScreen(
                     mediaService = mediaService,
                     featuresService = featuresService,
                     onDismiss = { selectedTemplateForCustomization = null },
-                    onSuccess = { generatedVideoUrl ->
+                    onProjectCreated = { project ->
                         selectedTemplateForCustomization = null
-                        selectedStudioTab = 0 // Switch to studio video player to preview
+                        activeEditorProject = project // Triggers RealPanuStudioEditorScreen
                     }
                 )
             }
@@ -816,11 +811,65 @@ private fun PanuAiVideoStudioTab(
                     PanuMediaPlayer(
                         mediaUrl = generatedVideoUrl!!,
                         thumbnailUrl = generatedThumbUrl ?: "",
-                        title = if (videoTitle.isNotBlank()) videoTitle else "Création IA",
+                        title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
                         durationLabel = selectedDuration,
                         isVideo = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        onDownload = {
+                            MediaDownloadManager.downloadMedia(
+                                context = context,
+                                url = generatedVideoUrl!!,
+                                title = if (videoTitle.isNotBlank()) videoTitle else "Création_IA_PANU",
+                                mediaType = MediaDownloadManager.MediaType.VIDEO
+                            )
+                        },
+                        onShare = {
+                            MediaDownloadManager.shareMedia(
+                                context = context,
+                                url = generatedVideoUrl!!,
+                                title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
+                                description = "🎬 Réalisé sur PANU Studio"
+                            )
+                        }
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                MediaDownloadManager.downloadMedia(
+                                    context = context,
+                                    url = generatedVideoUrl!!,
+                                    title = if (videoTitle.isNotBlank()) videoTitle else "Création_IA_PANU",
+                                    mediaType = MediaDownloadManager.MediaType.VIDEO
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Télécharger", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                MediaDownloadManager.shareMedia(
+                                    context = context,
+                                    url = generatedVideoUrl!!,
+                                    title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
+                                    description = "🎬 Réalisé sur PANU Studio"
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Partager", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -921,6 +970,10 @@ private fun PanuTemplatesCatalogTab(
     var templatesList by remember { mutableStateOf<List<PanuTemplate>>(emptyList()) }
     var isLoadingTemplates by remember { mutableStateOf(true) }
 
+    var showSellTemplateDialog by remember { mutableStateOf(false) }
+    var showPublishServiceDialog by remember { mutableStateOf(false) }
+    var showCreatorPayoutDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         val list = featuresService?.fetchPanuTemplates() ?: emptyList()
         templatesList = list
@@ -962,6 +1015,44 @@ private fun PanuTemplatesCatalogTab(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text("Créer avec l'IA", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+        }
+
+        // Actions de Monétisation & Vente pour les Créateurs PANU
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { showSellTemplateDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Vendre template", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = { showPublishServiceDialog = true },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.MovieFilter, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Service créatif", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = { showCreatorPayoutDialog = true },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Gains créateur", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
             }
         }
 
@@ -1040,6 +1131,35 @@ private fun PanuTemplatesCatalogTab(
                     )
                 }
             }
+        }
+
+        if (showSellTemplateDialog) {
+            SellCreatorTemplateDialog(
+                featuresService = featuresService,
+                onDismiss = { showSellTemplateDialog = false },
+                onTemplatePublished = { newTpl ->
+                    templatesList = listOf(newTpl) + templatesList
+                    showSellTemplateDialog = false
+                }
+            )
+        }
+
+        if (showPublishServiceDialog) {
+            PublishCreatorServiceDialog(
+                featuresService = featuresService,
+                onDismiss = { showPublishServiceDialog = false },
+                onServicePublished = {
+                    showPublishServiceDialog = false
+                }
+            )
+        }
+
+        if (showCreatorPayoutDialog) {
+            CreatorFundPayoutDialog(
+                isOpen = true,
+                featuresService = featuresService,
+                onDismiss = { showCreatorPayoutDialog = false }
+            )
         }
     }
 }
@@ -1176,6 +1296,34 @@ private fun RealPanuTemplateCard(
                     )
                 }
 
+                if (template.priceFcfa > 0 || template.creatorName != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (template.creatorName != null) "Créé par ${template.creatorName}" else "Template Officiel PANU",
+                            fontSize = 11.sp,
+                            color = colors.champagne,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Surface(
+                            color = if (template.priceFcfa > 0) colors.champagne.copy(alpha = 0.2f) else Color(0xFF2ED573).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (template.priceFcfa > 0) colors.champagne else Color(0xFF2ED573))
+                        ) {
+                            Text(
+                                text = if (template.priceFcfa > 0) "${template.priceFcfa} FCFA" else "Gratuit",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (template.priceFcfa > 0) colors.champagne else Color(0xFF2ED573),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Button(
@@ -1187,7 +1335,12 @@ private fun RealPanuTemplateCard(
                         .height(42.dp)
                         .testTag("btn_use_template_${template.id}")
                 ) {
-                    Text("Utiliser ce template", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                    Text(
+                        text = if (template.priceFcfa > 0) "Utiliser ce template (${template.priceFcfa} FCFA)" else "Utiliser ce template",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -1203,7 +1356,7 @@ private fun PanuTemplateCustomizerDialog(
     mediaService: CreativeMediaService,
     featuresService: SupabasePanuFeaturesService?,
     onDismiss: () -> Unit,
-    onSuccess: (String) -> Unit
+    onProjectCreated: (StudioProject) -> Unit
 ) {
     val colors = PanuTheme.colors
     val context = LocalContext.current
@@ -1316,54 +1469,26 @@ private fun PanuTemplateCustomizerDialog(
                 Button(
                     onClick = {
                         isGenerating = true
-                        errorMessage = null
-                        statusText = "Génération en cours… (Envoi au moteur $selectedEngine)"
+                        statusText = "Préparation du projet..."
 
                         scope.launch {
-                            // Construction du prompt structuré avec les données de l'utilisateur
-                            val userDetailsString = fieldValues.joinToString(", ") { "${it.first}: ${it.second.ifBlank { "Standard" }}" }
-                            val compiledPrompt = "${template.basePrompt} — Détails personnalisés : $userDetailsString, format ${template.aspectRatio}"
-
-                            val result = mediaService.generateMediaWithDuration(
-                                prompt = compiledPrompt,
+                            // Création de la structure du projet à partir du template
+                            val project = StudioProject(
+                                id = UUID.randomUUID().toString(),
                                 title = template.title,
-                                durationLabel = "${template.durationSeconds}\"",
-                                stylePreset = template.stylePreset,
-                                aiEngine = selectedEngine,
-                                onProgress = { msg, _ -> statusText = msg }
-                            )
-
-                            result.fold(
-                                onSuccess = { media ->
-                                    isGenerating = false
-                                    // Sauvegarde persistante dans les créations
-                                    try {
-                                        featuresService?.saveGeneratedAiVideoToSupabase(
-                                            title = template.title,
-                                            prompt = compiledPrompt,
-                                            stylePreset = template.stylePreset,
-                                            videoUrl = media.mediaUrl,
-                                            thumbnailUrl = media.thumbnailUrl
-                                        )
-                                        val canvasProj = CanvasProject(
-                                            id = UUID.randomUUID().toString(),
-                                            userId = featuresService?.sessionManager?.currentUserId?.value ?: "user_panu",
-                                            title = template.title,
-                                            exportFormat = "MP4",
-                                            previewUrl = media.mediaUrl
-                                        )
-                                        featuresService?.saveCanvasProject(canvasProj)
-                                    } catch (_: Exception) {}
-
-                                    Toast.makeText(context, "Vidéo « ${template.title} » générée et enregistrée !", Toast.LENGTH_SHORT).show()
-                                    onSuccess(media.mediaUrl)
-                                },
-                                onFailure = { err ->
-                                    isGenerating = false
-                                    statusText = null
-                                    errorMessage = err.message ?: "La génération a échoué. Réessayer."
+                                clips = template.scenes.map { scene ->
+                                    StudioMediaClip(
+                                        id = UUID.randomUUID().toString(),
+                                        uri = android.net.Uri.EMPTY,
+                                        type = StudioMediaType.IMAGE,
+                                        name = scene.name
+                                    )
                                 }
                             )
+                            
+                            isGenerating = false
+                            Toast.makeText(context, "Projet « ${template.title} » chargé dans l'éditeur !", Toast.LENGTH_SHORT).show()
+                            onProjectCreated(project)
                         }
                     },
                     enabled = !isGenerating,
@@ -1373,13 +1498,7 @@ private fun PanuTemplateCustomizerDialog(
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    if (isGenerating) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Génération en cours…", color = Color.Black, fontWeight = FontWeight.Bold)
-                    } else {
-                        Text("✨ Générer avec l'IA PANU", color = Color.Black, fontWeight = FontWeight.Black)
-                    }
+                    Text("✨ Charger dans l'éditeur", color = Color.Black, fontWeight = FontWeight.Black)
                 }
 
                 if (isGenerating && statusText != null) {
@@ -1411,329 +1530,325 @@ private fun PanuTemplateCustomizerDialog(
 }
 
 // =============================================================================
-// 3. STUDIO GRAPHIQUE PANU (TABLE `canvas_projects`)
+// MODAL DE VENTE DE TEMPLATE PAR UN CRÉATEUR PANU
 // =============================================================================
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PanuGraphicStudioTab(
-    featuresService: SupabasePanuFeaturesService?
+private fun SellCreatorTemplateDialog(
+    featuresService: SupabasePanuFeaturesService?,
+    onDismiss: () -> Unit,
+    onTemplatePublished: (PanuTemplate) -> Unit
 ) {
     val colors = PanuTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var projectTitle by remember { mutableStateOf("Affiche Officielle PANU") }
-    var backgroundHex by remember { mutableStateOf("#181920") }
-    var selectedExportFormat by remember { mutableStateOf("PNG") }
-    val exportFormats = listOf("PNG", "JPG", "MP4")
+    var title by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("📢 Publicité") }
+    var description by remember { mutableStateOf("") }
+    var basePrompt by remember { mutableStateOf("") }
+    var selectedPrice by remember { mutableIntStateOf(1000) }
+    var selectedEngine by remember { mutableStateOf("MiniMax/Hailuo") }
+    var isPublishing by remember { mutableStateOf(false) }
 
-    val layers = remember {
-        mutableStateListOf(
-            CanvasLayer(
-                id = "layer_shape_1",
-                type = CanvasLayerType.SHAPE,
-                content = "Bannière Or Royale",
-                x = 24f,
-                y = 28f,
-                colorHex = "#E5A93C"
-            ),
-            CanvasLayer(
-                id = "layer_text_1",
-                type = CanvasLayerType.TEXT,
-                content = "STUDIO CRÉATIF PANU",
-                x = 32f,
-                y = 95f,
-                colorHex = "#FFFFFF",
-                fontSizeSp = 22f
-            ),
-            CanvasLayer(
-                id = "layer_sticker_1",
-                type = CanvasLayerType.STICKER,
-                content = "🔥👑🎬✨",
-                x = 80f,
-                y = 165f,
-                fontSizeSp = 30f
-            )
-        )
-    }
+    val categories = listOf("📢 Publicité", "🎵 Musique", "😂 Humour", "🛍️ Produits", "🎓 Formation", "🎬 Cinéma", "🇨🇩 RDC")
+    val prices = listOf(0, 500, 1000, 2500, 5000)
+    val engines = listOf("MiniMax/Hailuo", "Kling", "Luma", "Flux/BFL")
 
-    var selectedLayerId by remember { mutableStateOf<String?>(layers.firstOrNull()?.id) }
-    var customLayerText by remember { mutableStateOf("Nouveau Texte PANU") }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val savedProjects = featuresService?.savedCanvasProjects?.collectAsState()?.value ?: emptyList()
-    val hasNoWatermarkHd = featuresService?.hasNoWatermarkHdPass?.collectAsState()?.value ?: false
-    var showExport5sAdDialog by remember { mutableStateOf(false) }
-
-    fun triggerCanvasDownloadExport() {
-        Toast.makeText(
-            context,
-            "📥 Téléchargement de « $projectTitle.${selectedExportFormat.lowercase()} » réussi !",
-            Toast.LENGTH_LONG
-        ).show()
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "Créé avec le Studio PANU : $projectTitle")
-        }
-        context.startActivity(Intent.createChooser(shareIntent, "Partager le design"))
-    }
-
-    FiveSecondVideoAdDialog(
-        isOpen = showExport5sAdDialog,
-        triggerActionLabel = "Exporter le visuel",
-        featuresService = featuresService,
-        onAdCompleted = { triggerCanvasDownloadExport() },
-        onOpenCreditsStore = { },
-        onDismiss = { showExport5sAdDialog = false }
-    )
-
-    LaunchedEffect(Unit) {
-        featuresService?.fetchCanvasProjects()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    Dialog(onDismissRequest = { if (!isPublishing) onDismiss() }) {
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = colors.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, colors.surfaceBorder)
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Brush, contentDescription = null, tint = colors.champagne)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Studio Graphique & Design PANU",
+                            text = "💰 Vendre un Template sur PANU",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "Composition visuelle multi-calques vectorielle & exports haute fidélité",
+                            text = "Monétisez votre créativité (70% reversés à chaque utilisation)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
+                            color = colors.champagne
+                        )
+                    }
+                    IconButton(onClick = onDismiss, enabled = !isPublishing) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = colors.textSecondary)
+                    }
+                }
+
+                HorizontalDivider(color = colors.surfaceBorder)
+
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Titre du template *") },
+                    placeholder = { Text("ex: Spot Publicitaire Restaurant 8K") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Catégorie :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(categories) { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = { Text(cat, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = Color.Black
+                            )
                         )
                     }
                 }
 
                 OutlinedTextField(
-                    value = projectTitle,
-                    onValueChange = { projectTitle = it },
-                    label = { Text("Nom du Projet Graphique") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description pour les créateurs *") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                // Sélecteur de couleur d'arrière-plan
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Fond :", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    val bgColors = listOf("#181920", "#000000", "#1E1233", "#0B251F", "#3B1F0B", "#FFFFFF")
-                    bgColors.forEach { hex ->
-                        val parsedColor = try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { Color.Black }
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(parsedColor)
-                                .border(
-                                    width = if (backgroundHex == hex) 2.dp else 1.dp,
-                                    color = if (backgroundHex == hex) colors.champagne else Color.Gray,
-                                    shape = CircleShape
-                                )
-                                .clickable { backgroundHex = hex }
+                OutlinedTextField(
+                    value = basePrompt,
+                    onValueChange = { basePrompt = it },
+                    label = { Text("Prompt IA de base & Mise en scène *") },
+                    placeholder = { Text("Instructions visuelles 8K, éclairage, découpage...") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Prix d'utilisation par un créateur :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    prices.forEach { p ->
+                        FilterChip(
+                            selected = selectedPrice == p,
+                            onClick = { selectedPrice = p },
+                            label = { Text(if (p == 0) "Gratuit" else "$p FCFA", fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = Color.Black
+                            )
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                     }
                 }
 
-                // Zone de Canvas Interactif
-                val canvasParsedBg = try { Color(android.graphics.Color.parseColor(backgroundHex)) } catch (_: Exception) { Color.Black }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(canvasParsedBg)
-                        .border(1.dp, colors.surfaceBorder, RoundedCornerShape(12.dp))
-                        .testTag("interactive_canvas_preview")
-                ) {
-                    layers.forEach { layer ->
-                        val isSelected = layer.id == selectedLayerId
-                        val layerColor = try { Color(android.graphics.Color.parseColor(layer.colorHex)) } catch (_: Exception) { Color.White }
-                        var offsetX by remember(layer.id) { mutableStateOf(layer.x) }
-                        var offsetY by remember(layer.id) { mutableStateOf(layer.y) }
-
-                        Box(
-                            modifier = Modifier
-                                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                                .pointerInput(layer.id) {
-                                    detectDragGestures { change, dragAmount ->
-                                        change.consume()
-                                        offsetX = (offsetX + dragAmount.x).coerceIn(0f, 600f)
-                                        offsetY = (offsetY + dragAmount.y).coerceIn(0f, 500f)
-                                        val idx = layers.indexOfFirst { it.id == layer.id }
-                                        if (idx != -1) {
-                                            layers[idx] = layers[idx].copy(x = offsetX, y = offsetY)
-                                        }
-                                    }
-                                }
-                                .clickable { selectedLayerId = layer.id }
-                                .border(
-                                    width = if (isSelected) 1.5.dp else 0.dp,
-                                    color = if (isSelected) colors.champagne else Color.Transparent,
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                                .padding(4.dp)
-                        ) {
-                            when (layer.type) {
-                                CanvasLayerType.TEXT -> {
-                                    Text(
-                                        text = layer.content,
-                                        color = layerColor,
-                                        fontSize = layer.fontSizeSp.sp,
-                                        fontWeight = if (layer.isBold) FontWeight.Black else FontWeight.Normal
-                                    )
-                                }
-                                CanvasLayerType.STICKER -> {
-                                    Text(
-                                        text = layer.content,
-                                        fontSize = layer.fontSizeSp.sp
-                                    )
-                                }
-                                CanvasLayerType.SHAPE -> {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(width = 180.dp, height = 26.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(layerColor.copy(alpha = 0.85f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = layer.content,
-                                            fontSize = 11.sp,
-                                            color = Color.Black,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                                CanvasLayerType.IMAGE -> {
-                                    AsyncImage(
-                                        model = layer.content,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Outils d'ajout de calques
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            val newLayer = CanvasLayer(
-                                id = "layer_${UUID.randomUUID().toString().take(6)}",
-                                type = CanvasLayerType.TEXT,
-                                content = customLayerText.ifBlank { "Nouveau Texte PANU" },
-                                x = 40f,
-                                y = 100f
+                Text("Moteur IA recommandé :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    engines.forEach { eng ->
+                        FilterChip(
+                            selected = selectedEngine == eng,
+                            onClick = { selectedEngine = eng },
+                            label = { Text(eng, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = Color.Black
                             )
-                            layers.add(newLayer)
-                            selectedLayerId = newLayer.id
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("+ Texte", fontSize = 11.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val newLayer = CanvasLayer(
-                                id = "layer_${UUID.randomUUID().toString().take(6)}",
-                                type = CanvasLayerType.STICKER,
-                                content = "🔥✨👑💎",
-                                x = 60f,
-                                y = 140f
-                            )
-                            layers.add(newLayer)
-                            selectedLayerId = newLayer.id
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.EmojiEmotions, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("+ Sticker", fontSize = 11.sp)
+                        )
                     }
                 }
 
-                // Actions de Sauvegarde et d'Exportation
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            if (isSaving) return@Button
-                            isSaving = true
-                            scope.launch {
-                                val project = CanvasProject(
-                                    id = UUID.randomUUID().toString(),
-                                    userId = featuresService?.sessionManager?.currentUserId?.value ?: "user_panu",
-                                    title = projectTitle,
-                                    backgroundHex = backgroundHex,
-                                    layers = layers.toList(),
-                                    exportFormat = selectedExportFormat
-                                )
-                                featuresService?.saveCanvasProjectToSupabase(project)
-                                isSaving = false
-                                Toast.makeText(context, "Projet sauvegardé dans « Mes créations » !", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        enabled = !isSaving,
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Sauvegarder", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Button(
+                    onClick = {
+                        if (title.isBlank() || basePrompt.isBlank()) {
+                            android.widget.Toast.makeText(context, "Veuillez remplir le titre et le prompt", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
                         }
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            if (hasNoWatermarkHd) {
-                                triggerCanvasDownloadExport()
+                        isPublishing = true
+                        scope.launch {
+                            val res = featuresService?.publishCreatorTemplate(
+                                title = title,
+                                description = description.ifBlank { "Template vidéo haute performance généré par IA" },
+                                category = category,
+                                basePrompt = basePrompt,
+                                stylePreset = "Cinématographique 8K",
+                                recommendedEngine = selectedEngine,
+                                priceFcfa = selectedPrice
+                            )
+                            isPublishing = false
+                            val tpl = res?.getOrNull()
+                            if (tpl != null) {
+                                android.widget.Toast.makeText(context, "🎉 Template « $title » mis en vente !", android.widget.Toast.LENGTH_SHORT).show()
+                                onTemplatePublished(tpl)
                             } else {
-                                showExport5sAdDialog = true
+                                android.widget.Toast.makeText(context, "Erreur de publication", android.widget.Toast.LENGTH_SHORT).show()
                             }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Exporter ($selectedExportFormat)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    enabled = !isPublishing && title.isNotBlank() && basePrompt.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    if (isPublishing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                    } else {
+                        Text("Publier et Mettre en Vente", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     }
 }
+
+// =============================================================================
+// MODAL DE PUBLICATION D'UNE PRESTATION FREELANCE CRÉATIVE
+// =============================================================================
+@Composable
+private fun PublishCreatorServiceDialog(
+    featuresService: SupabasePanuFeaturesService?,
+    onDismiss: () -> Unit,
+    onServicePublished: () -> Unit
+) {
+    val colors = PanuTheme.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var title by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("Vidéo 8K") }
+    var description by remember { mutableStateOf("") }
+    var priceFcfa by remember { mutableStateOf("15000") }
+    var turnaroundDays by remember { mutableIntStateOf(2) }
+    var contactWhatsapp by remember { mutableStateOf("+243") }
+    var isPublishing by remember { mutableStateOf(false) }
+
+    val categories = listOf("Vidéo 8K", "Montage", "Voix Off", "Scénario", "Publicité")
+
+    Dialog(onDismissRequest = { if (!isPublishing) onDismiss() }) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "💼 Proposer une Prestation",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Offrez vos compétences de création aux utilisateurs de PANU",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.champagne
+                        )
+                    }
+                    IconButton(onClick = onDismiss, enabled = !isPublishing) {
+                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = colors.textSecondary)
+                    }
+                }
+
+                HorizontalDivider(color = colors.surfaceBorder)
+
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Intitulé du service *") },
+                    placeholder = { Text("ex: Réalisation Spot Publicitaire Complet") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Spécialité :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    categories.forEach { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = { Text(cat, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = Color.Black
+                            )
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Détails de la prestation & livrables *") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = priceFcfa,
+                    onValueChange = { priceFcfa = it },
+                    label = { Text("Tarif en FCFA *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = contactWhatsapp,
+                    onValueChange = { contactWhatsapp = it },
+                    label = { Text("Numéro WhatsApp professionnel *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = {
+                        val parsedPrice = priceFcfa.toIntOrNull() ?: 10000
+                        if (title.isBlank()) {
+                            android.widget.Toast.makeText(context, "Veuillez renseigner un intitulé", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isPublishing = true
+                        scope.launch {
+                            featuresService?.publishCreatorService(
+                                title = title,
+                                category = category,
+                                description = description,
+                                priceFcfa = parsedPrice,
+                                turnaroundDays = turnaroundDays,
+                                contactWhatsapp = contactWhatsapp
+                            )
+                            isPublishing = false
+                            android.widget.Toast.makeText(context, "✅ Prestation « $title » publiée sur PANU !", android.widget.Toast.LENGTH_SHORT).show()
+                            onServicePublished()
+                        }
+                    },
+                    enabled = !isPublishing && title.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    if (isPublishing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                    } else {
+                        Text("Publier la Prestation", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+

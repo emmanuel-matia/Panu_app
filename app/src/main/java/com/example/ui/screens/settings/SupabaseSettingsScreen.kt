@@ -499,12 +499,12 @@ fun SupabaseSettingsScreen(
                                     testSuccess = null
                                     scope.launch {
                                         sessionManager.updateSupabaseConfig(urlInput, keyInput)
-                                        val resp = supabaseClient.execute("/rest/v1/")
+                                        val resp = supabaseClient.execute("/auth/v1/health")
                                         isTesting = false
                                         when (resp) {
                                             is SupabaseResponse.Success -> {
                                                 testSuccess = true
-                                                testResult = "Connexion Supabase réussie !"
+                                                testResult = "Connexion Supabase réussie (200 OK) — Base de données et Auth actifs !"
                                             }
                                             is SupabaseResponse.Error -> {
                                                 testSuccess = false

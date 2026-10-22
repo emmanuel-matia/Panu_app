@@ -533,6 +533,9 @@ fun ActivityScreen(
                                 updatedAt = System.currentTimeMillis()
                             )
                             val res = postRepository.savePost(newPost)
+                            if (res.isSuccess) {
+                                featuresService?.updateCanvasProjectStatus(proj.id, true)
+                            }
                             isPublishing = false
                             selectedCanvasProjectForPublish = null
                             if (res.isSuccess) {

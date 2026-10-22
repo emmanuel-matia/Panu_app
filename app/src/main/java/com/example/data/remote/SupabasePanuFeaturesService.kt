@@ -603,6 +603,19 @@ class SupabasePanuFeaturesService(
         _savedCanvasProjects.value
     }
 
+    suspend fun updateCanvasProjectStatus(projectId: String, isPublished: Boolean) = withContext(Dispatchers.IO) {
+        try {
+            val payload = JSONObject().apply {
+                put("is_published", isPublished)
+            }
+            client.execute(
+                endpoint = "/rest/v1/canvas_projects?id=eq.$projectId",
+                method = "PATCH",
+                jsonBody = payload.toString()
+            )
+        } catch (_: Exception) {}
+    }
+
     // =========================================================================
     // 3. TEMPLATES VIDÉO PANU RÉELS & STRUCTURÉS PAR CATÉGORIES
     // =========================================================================

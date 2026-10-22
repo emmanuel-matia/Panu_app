@@ -19,12 +19,22 @@ class PostRepository(
     fun getPublicAuthorPosts(userId: String): Flow<List<Post>> = postDao.getPublishedPostsByAuthor(userId)
 
     suspend fun refreshPublishedPosts(): Result<List<Post>> {
-        val result = postService.getPublishedPosts()
-        if (result.isSuccess) {
-            val list = result.getOrNull() ?: emptyList()
-            postDao.insertPosts(list)
+        val resultPosts = postService.getPublishedPosts()
+        val resultCanvas = postService.getCanvasProjectsAsPosts()
+
+        val allPosts = mutableListOf<Post>()
+        if (resultPosts.isSuccess) {
+            allPosts.addAll(resultPosts.getOrNull() ?: emptyList())
         }
-        return result
+        if (resultCanvas.isSuccess) {
+            allPosts.addAll(resultCanvas.getOrNull() ?: emptyList())
+        }
+
+        if (allPosts.isNotEmpty()) {
+            postDao.insertPosts(allPosts)
+            return Result.success(allPosts)
+        }
+        return resultPosts
     }
 
     suspend fun refreshUserPosts(userId: String): Result<List<Post>> {

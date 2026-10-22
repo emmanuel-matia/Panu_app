@@ -210,17 +210,17 @@ data class VisibilityBoostPlan(
 
 data class CreatorRemunerationStats(
     val userId: String,
-    val totalViews: Long = 18450,
-    val totalShares: Long = 2190,
-    val giftsReceivedCredits: Int = 680,
-    val adImpressionsCount: Int = 342,
-    val adRevenueFcfa: Double = 21500.0,
-    val viewsAndSharesBonusFcfa: Double = 45200.0,
+    val totalViews: Long = 0L,
+    val totalShares: Long = 0L,
+    val giftsReceivedCredits: Int = 0,
+    val adImpressionsCount: Int = 0,
+    val adRevenueFcfa: Double = 0.0,
+    val viewsAndSharesBonusFcfa: Double = 0.0,
     val creatorFundCommissionPercent: Int = 55,
-    val creatorFundShareFcfa: Double = 28400.0,
-    val boostedVideosCount: Int = 2,
-    val boostedViewsGained: Long = 12500,
-    val totalAvailableFcfa: Double = 95100.0
+    val creatorFundShareFcfa: Double = 0.0,
+    val boostedVideosCount: Int = 0,
+    val boostedViewsGained: Long = 0L,
+    val totalAvailableFcfa: Double = 0.0
 )
 
 // 6. Modèle d'Attestation de Carte de Membre / Personnel (table member_cards & RPC verify_member_card)

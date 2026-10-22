@@ -107,7 +107,9 @@ import com.example.data.model.PanuTemplateField
 import com.example.data.model.StudioAudioTrack
 import com.example.data.model.StudioMediaClip
 import com.example.data.model.StudioMediaType
+import com.example.data.catalog.PanuVideoTemplateCatalog
 import com.example.data.model.StudioProject
+import com.example.data.model.toStudioProject
 import com.example.data.model.VideoStylePreset
 import com.example.data.remote.SupabasePanuFeaturesService
 import com.example.data.repository.GeminiRepository
@@ -148,6 +150,17 @@ fun StudioScreen(
 
     var selectedTemplateForCustomization by remember { mutableStateOf<PanuTemplate?>(null) }
     var activeEditorProject by remember { mutableStateOf<StudioProject?>(null) }
+
+    if (activeEditorProject != null) {
+        RealPanuStudioEditorScreen(
+            initialProject = activeEditorProject!!,
+            mediaService = mediaService,
+            featuresService = featuresService,
+            geminiRepository = geminiRepository,
+            onClose = { activeEditorProject = null }
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -244,12 +257,16 @@ fun StudioScreen(
                     mediaService = mediaService,
                     featuresService = featuresService,
                     onNavigateToTemplates = { selectedStudioTab = 1 },
-                    onNavigateToCreations = { onNavigate(PanuScreen.Creations.route) }
+                    onNavigateToCreations = { onNavigate(PanuScreen.Creations.route) },
+                    onOpenEditor = { project -> activeEditorProject = project }
                 )
                 1 -> PanuTemplatesCatalogTab(
                     featuresService = featuresService,
                     onSelectTemplate = { tpl ->
                         selectedTemplateForCustomization = tpl
+                    },
+                    onEditDirectly = { project ->
+                        activeEditorProject = project
                     },
                     onCreateWithAi = { selectedStudioTab = 0 }
                 )
@@ -290,7 +307,8 @@ private fun PanuAiVideoStudioTab(
     mediaService: CreativeMediaService,
     featuresService: SupabasePanuFeaturesService?,
     onNavigateToTemplates: () -> Unit,
-    onNavigateToCreations: () -> Unit
+    onNavigateToCreations: () -> Unit,
+    onOpenEditor: (StudioProject) -> Unit
 ) {
     val colors = PanuTheme.colors
     val context = LocalContext.current
@@ -313,7 +331,6 @@ private fun PanuAiVideoStudioTab(
     // Nouveaux états et launchers pour le Module Nouveau Projet & Éditeur Mobile Réel
     var showNewProjectChooser by remember { mutableStateOf(false) }
     var activeCameraMode by remember { mutableStateOf<Boolean?>(null) }
-    var activeEditorProject by remember { mutableStateOf<StudioProject?>(null) }
     var pendingCameraAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -349,10 +366,12 @@ private fun PanuAiVideoStudioTab(
                     name = "Média ${idx + 1}"
                 )
             }
-            activeEditorProject = StudioProject(
-                id = UUID.randomUUID().toString(),
-                title = "Projet Galerie PANU",
-                clips = clipsList
+            onOpenEditor(
+                StudioProject(
+                    id = UUID.randomUUID().toString(),
+                    title = "Projet Galerie PANU",
+                    clips = clipsList
+                )
             )
         }
     }
@@ -366,22 +385,14 @@ private fun PanuAiVideoStudioTab(
                 uri = uri,
                 title = "Piste audio importée"
             )
-            activeEditorProject = StudioProject(
-                id = UUID.randomUUID().toString(),
-                title = "Projet Audio PANU",
-                audioTracks = listOf(audioTrack)
+            onOpenEditor(
+                StudioProject(
+                    id = UUID.randomUUID().toString(),
+                    title = "Projet Audio PANU",
+                    audioTracks = listOf(audioTrack)
+                )
             )
         }
-    }
-
-    if (activeEditorProject != null) {
-        RealPanuStudioEditorScreen(
-            initialProject = activeEditorProject!!,
-            mediaService = mediaService,
-            featuresService = featuresService,
-            onClose = { activeEditorProject = null }
-        )
-        return
     }
 
     if (activeCameraMode != null) {
@@ -389,15 +400,17 @@ private fun PanuAiVideoStudioTab(
             isRecordingMode = activeCameraMode!!,
             onMediaCaptured = { uri, type ->
                 activeCameraMode = null
-                activeEditorProject = StudioProject(
-                    id = UUID.randomUUID().toString(),
-                    title = "Projet Capture Caméra",
-                    clips = listOf(
-                        StudioMediaClip(
-                            id = UUID.randomUUID().toString(),
-                            uri = uri,
-                            type = type,
-                            name = "Capture"
+                onOpenEditor(
+                    StudioProject(
+                        id = UUID.randomUUID().toString(),
+                        title = "Projet Capture Caméra",
+                        clips = listOf(
+                            StudioMediaClip(
+                                id = UUID.randomUUID().toString(),
+                                uri = uri,
+                                type = type,
+                                name = "Capture"
+                            )
                         )
                     )
                 )
@@ -889,6 +902,39 @@ private fun PanuAiVideoStudioTab(
                             Text("🚀 Booster", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
+
+                    Button(
+                        onClick = {
+                            val vidUri = android.net.Uri.parse(generatedVideoUrl!!)
+                            onOpenEditor(
+                                StudioProject(
+                                    id = UUID.randomUUID().toString(),
+                                    title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
+                                    aspectRatio = when (selectedAspectRatio) {
+                                    "16:9" -> com.example.data.model.StudioAspectRatio.RATIO_16_9
+                                    "1:1" -> com.example.data.model.StudioAspectRatio.RATIO_1_1
+                                    else -> com.example.data.model.StudioAspectRatio.RATIO_9_16
+                                },
+                                    clips = listOf(
+                                        StudioMediaClip(
+                                            id = UUID.randomUUID().toString(),
+                                            uri = vidUri,
+                                            type = StudioMediaType.VIDEO,
+                                            name = "Séquence IA"
+                                        )
+                                    )
+                                )
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_edit_generated_video")
+                    ) {
+                        Icon(Icons.Default.MovieFilter, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("🎬 Ouvrir dans l'éditeur vidéo PANU", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -946,25 +992,13 @@ private fun PanuAiVideoStudioTab(
 private fun PanuTemplatesCatalogTab(
     featuresService: SupabasePanuFeaturesService?,
     onSelectTemplate: (PanuTemplate) -> Unit,
+    onEditDirectly: (StudioProject) -> Unit,
     onCreateWithAi: () -> Unit
 ) {
     val colors = PanuTheme.colors
     val scope = rememberCoroutineScope()
 
-    val categories = listOf(
-        "Tous",
-        "🔥 Tendances",
-        "📱 TikTok / Shorts / Reels",
-        "🎬 Cinéma",
-        "📢 Publicité",
-        "🛍️ Produits & commerces",
-        "🎵 Musique",
-        "😂 Humour",
-        "🙏 Église & événements",
-        "🇨🇩 Afrique / RDC",
-        "🎓 Formation",
-        "💼 Entreprise"
-    )
+    val categories = PanuVideoTemplateCatalog.CATEGORIES
 
     var selectedCategory by remember { mutableStateOf("Tous") }
     var templatesList by remember { mutableStateOf<List<PanuTemplate>>(emptyList()) }
@@ -975,14 +1009,14 @@ private fun PanuTemplatesCatalogTab(
     var showCreatorPayoutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val list = featuresService?.fetchPanuTemplates() ?: emptyList()
-        templatesList = list
+        val remote = featuresService?.fetchPanuTemplates() ?: emptyList()
+        templatesList = if (remote.isNotEmpty()) remote else PanuVideoTemplateCatalog.ALL_TEMPLATES
         isLoadingTemplates = false
     }
 
     val filteredTemplates = remember(templatesList, selectedCategory) {
         if (selectedCategory == "Tous") templatesList
-        else templatesList.filter { it.category.contains(selectedCategory.removePrefix("🔥 ").removePrefix("📱 ").removePrefix("🎬 ").removePrefix("📢 ").removePrefix("🛍️ ").removePrefix("🎵 ").removePrefix("😂 ").removePrefix("🙏 ").removePrefix("🇨🇩 ").removePrefix("🎓 ").removePrefix("💼 "), ignoreCase = true) }
+        else templatesList.filter { it.category.equals(selectedCategory, ignoreCase = true) }
     }
 
     Column(
@@ -1127,7 +1161,8 @@ private fun PanuTemplatesCatalogTab(
                 items(filteredTemplates, key = { it.id }) { template ->
                     RealPanuTemplateCard(
                         template = template,
-                        onUseTemplate = { onSelectTemplate(template) }
+                        onUseTemplate = { onSelectTemplate(template) },
+                        onEditDirectly = { onEditDirectly(template.toStudioProject()) }
                     )
                 }
             }
@@ -1167,7 +1202,8 @@ private fun PanuTemplatesCatalogTab(
 @Composable
 private fun RealPanuTemplateCard(
     template: PanuTemplate,
-    onUseTemplate: () -> Unit
+    onUseTemplate: () -> Unit,
+    onEditDirectly: () -> Unit
 ) {
     val colors = PanuTheme.colors
 
@@ -1177,7 +1213,6 @@ private fun RealPanuTemplateCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.surfaceBorder),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onUseTemplate() }
             .testTag("template_card_${template.id}")
     ) {
         Column {
@@ -1232,7 +1267,7 @@ private fun RealPanuTemplateCard(
                     )
                 }
 
-                // Format & Durée (Pas de compteur fictif !)
+                // Format & Durée
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -1326,21 +1361,41 @@ private fun RealPanuTemplateCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Button(
-                    onClick = onUseTemplate,
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .testTag("btn_use_template_${template.id}")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = if (template.priceFcfa > 0) "Utiliser ce template (${template.priceFcfa} FCFA)" else "Utiliser ce template",
-                        color = Color.Black,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 12.sp
-                    )
+                    Button(
+                        onClick = onEditDirectly,
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .testTag("btn_edit_template_${template.id}")
+                    ) {
+                        Text(
+                            text = "🎬 Monter vidéo",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onUseTemplate,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .testTag("btn_customize_template_${template.id}")
+                    ) {
+                        Text(
+                            text = "⚡ Personnaliser",
+                            color = colors.champagne,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
         }

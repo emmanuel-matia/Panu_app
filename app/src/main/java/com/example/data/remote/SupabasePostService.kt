@@ -26,6 +26,49 @@ class SupabasePostService(private val client: SupabaseClient) {
         }
     }
 
+    suspend fun getCanvasProjectsAsPosts(): Result<List<Post>> = withContext(Dispatchers.IO) {
+        val endpoint = "/rest/v1/canvas_projects?order=updated_at.desc&select=id,user_id,title,exportFormat,previewUrl,updated_at,profiles(full_name,username,avatar_url)"
+        when (val response = client.execute(endpoint)) {
+            is SupabaseResponse.Success -> {
+                val array = response.asJsonArray() ?: JSONArray()
+                val list = mutableListOf<Post>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.optString("id")
+                    val userId = obj.optString("user_id")
+                    val title = obj.optString("title", "Création Studio PANU")
+                    val exportFormat = obj.optString("exportFormat", "MP4")
+                    val previewUrl = obj.optString("previewUrl").takeIf { it.isNotBlank() }
+                    val profilesObj = obj.optJSONObject("profiles")
+
+                    val mediaType = if (exportFormat.equals("MP4", ignoreCase = true) || (previewUrl?.endsWith(".mp4", ignoreCase = true) == true)) "video" else "image"
+
+                    list.add(
+                        Post(
+                            id = "canvas_$id",
+                            authorId = userId,
+                            authorName = profilesObj?.optString("full_name")?.takeIf { it.isNotBlank() } ?: "Créateur PANU",
+                            authorUsername = profilesObj?.optString("username")?.takeIf { it.isNotBlank() } ?: "createur",
+                            authorAvatarUrl = profilesObj?.optString("avatar_url"),
+                            title = title,
+                            content = "Nouvelle création réalisée avec le Studio IA PANU ($exportFormat)",
+                            mediaUrl = previewUrl,
+                            mediaType = mediaType,
+                            status = "published",
+                            visibility = "public",
+                            likesCount = 0,
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+                Result.success(list)
+            }
+            is SupabaseResponse.Error -> Result.failure(Exception(response.message))
+            is SupabaseResponse.NetworkError -> Result.failure(Exception(response.message))
+        }
+    }
+
     suspend fun getUserPosts(authorId: String): Result<List<Post>> = withContext(Dispatchers.IO) {
         val endpoint = "/rest/v1/posts?author_id=eq.$authorId&order=created_at.desc&select=*"
         when (val response = client.execute(endpoint)) {

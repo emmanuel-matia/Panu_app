@@ -131,6 +131,7 @@ fun ActivityScreen(
     var activeFilter by remember { mutableStateOf(CreationFilter.ALL) }
     var selectedPostForPreview by remember { mutableStateOf<Post?>(null) }
     var selectedCanvasProjectForPreview by remember { mutableStateOf<CanvasProject?>(null) }
+    var selectedCanvasProjectForPublish by remember { mutableStateOf<CanvasProject?>(null) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
     var watermarkProjectTitle by remember { mutableStateOf<String?>(null) }
@@ -484,6 +485,82 @@ fun ActivityScreen(
         )
     }
 
+    if (selectedCanvasProjectForPublish != null) {
+        val proj = selectedCanvasProjectForPublish!!
+        var caption by remember { mutableStateOf(proj.title) }
+        var hashtags by remember { mutableStateOf("#PANUStudio #AIArt #Panafrique") }
+        var isPublishing by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { selectedCanvasProjectForPublish = null },
+            title = { Text("Publier sur l'Accueil", fontWeight = FontWeight.Bold, color = PanuTextPrimaryDark) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Partagez votre création (${proj.exportFormat}) sur le fil d'actualité PANU.", color = PanuTextSecondaryDark, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = caption,
+                        onValueChange = { caption = it },
+                        label = { Text("Légende / Description") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = hashtags,
+                        onValueChange = { hashtags = it },
+                        label = { Text("Hashtags") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isPublishing = true
+                        scope.launch {
+                            val mediaUrl = proj.previewUrl ?: proj.layers.firstOrNull { it.type == com.example.data.model.CanvasLayerType.IMAGE }?.content ?: ""
+                            val mediaType = if (proj.exportFormat == "MP4") "video" else "image"
+                            val newPost = Post(
+                                id = "pub_${System.currentTimeMillis()}",
+                                authorId = sessionManager.currentUserId.value ?: "user_studio",
+                                authorName = sessionManager.currentUserEmail.value?.substringBefore("@") ?: "Créateur PANU",
+                                title = proj.title,
+                                content = "$caption\n\n$hashtags",
+                                mediaUrl = mediaUrl,
+                                mediaType = mediaType,
+                                status = "published",
+                                visibility = "public",
+                                likesCount = 0,
+                                createdAt = System.currentTimeMillis(),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            val res = postRepository.savePost(newPost)
+                            isPublishing = false
+                            selectedCanvasProjectForPublish = null
+                            if (res.isSuccess) {
+                                operationSuccess = "✨ Création publiée avec succès sur l'Accueil !"
+                            } else {
+                                operationError = "Erreur de publication : ${res.exceptionOrNull()?.localizedMessage}"
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PanuGold),
+                    enabled = !isPublishing
+                ) {
+                    if (isPublishing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = PanuObsidian)
+                    } else {
+                        Text("Publier", color = PanuObsidian, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedCanvasProjectForPublish = null }) {
+                    Text("Annuler", color = PanuTextSecondaryDark)
+                }
+            },
+            containerColor = PanuSurfaceDark
+        )
+    }
+
     Scaffold(
         topBar = {
             PanuTopBar(
@@ -600,7 +677,8 @@ fun ActivityScreen(
                         items(savedCanvasProjects, key = { "canvas_${it.id}" }) { proj ->
                             CanvasProjectCard(
                                 project = proj,
-                                onPreview = { selectedCanvasProjectForPreview = proj }
+                                onPreview = { selectedCanvasProjectForPreview = proj },
+                                onPublish = { selectedCanvasProjectForPublish = proj }
                             )
                         }
                         if (filteredPosts.isNotEmpty()) {
@@ -645,12 +723,12 @@ fun ActivityScreen(
 @Composable
 private fun CanvasProjectCard(
     project: CanvasProject,
-    onPreview: () -> Unit
+    onPreview: () -> Unit,
+    onPublish: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onPreview)
             .testTag("canvas_project_${project.id}"),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = PanuSurfaceDark),
@@ -692,19 +770,30 @@ private fun CanvasProjectCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${project.layers.size} calques • Rendu ${project.exportFormat} prêt",
-                    fontSize = 12.sp,
+                    text = "${project.layers.size} calques • ${project.exportFormat} prêt",
+                    fontSize = 11.sp,
                     color = PanuTextSecondaryDark
                 )
-                Button(
-                    onClick = onPreview,
-                    colors = ButtonDefaults.buttonColors(containerColor = PanuGold),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = PanuObsidian, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Lire le média", color = PanuObsidian, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        onClick = onPreview,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = PanuGold, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("Lire", color = PanuGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onPublish,
+                        colors = ButtonDefaults.buttonColors(containerColor = PanuGold),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Public, contentDescription = null, tint = PanuObsidian, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("Publier", color = PanuObsidian, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    }
                 }
             }
         }

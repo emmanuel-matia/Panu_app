@@ -606,7 +606,8 @@ class SupabasePanuFeaturesService(
     // =========================================================================
     // 3. TEMPLATES VIDÉO PANU RÉELS & STRUCTURÉS PAR CATÉGORIES
     // =========================================================================
-    val officialPanuTemplates = listOf(
+    val officialPanuTemplates: List<PanuTemplate> get() = com.example.data.catalog.PanuVideoTemplateCatalog.ALL_TEMPLATES
+    private val legacyPanuTemplates = listOf(
         PanuTemplate(
             id = "tpl_panu_entreprise",
             title = "Publicité Entreprise & Commerce",

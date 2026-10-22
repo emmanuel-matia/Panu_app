@@ -148,7 +148,7 @@ fun SeriesGeneratorScreen(
 
     var isGeneratingMedia by remember { mutableStateOf(false) }
     var generationProgressText by remember { mutableStateOf<String?>(null) }
-    var generatedVideoUrl by remember { mutableStateOf(PanuMediaConstants.DEFAULT_FALLBACK_VIDEO) }
+    var generatedVideoUrl by remember { mutableStateOf<String?>(null) }
     var generatedSegments by remember { mutableStateOf<List<VideoSequenceSegment>>(emptyList()) }
     var hasGeneratedMedia by remember { mutableStateOf(false) }
 
@@ -604,7 +604,7 @@ private fun SeriesCreationTab(
     onVisualStyleChange: (String) -> Unit,
     isGeneratingMedia: Boolean,
     generationProgressText: String?,
-    generatedVideoUrl: String,
+    generatedVideoUrl: String?,
     generatedSegments: List<VideoSequenceSegment>,
     hasGeneratedMedia: Boolean,
     onTriggerGeneration: () -> Unit
@@ -620,7 +620,7 @@ private fun SeriesCreationTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. LECTEUR MÉDIA DIRECT (REMPLACEMENT DES CARTES DE TEXTE DE PROMPT)
+        // 1. LECTEUR MÉDIA RÉEL OU ÉTAT INITIAL HONNÊTE
         Text(
             text = "🎬 Aperçu Vidéo Photoréaliste Direct (Lecteur MP4 8K) :",
             fontWeight = FontWeight.Bold,
@@ -628,35 +628,46 @@ private fun SeriesCreationTab(
             color = MaterialTheme.colorScheme.primary
         )
 
-        PanuMediaPlayer(
-            mediaUrl = generatedVideoUrl,
-            title = title,
-            durationLabel = selectedDuration,
-            isVideo = true,
-            onDownload = {
-                MediaDownloadManager.downloadMedia(
-                    context = context,
-                    url = generatedVideoUrl,
-                    title = title,
-                    mediaType = MediaDownloadManager.MediaType.VIDEO
-                )
-            },
-            onShare = {
-                MediaDownloadManager.shareMedia(
-                    context = context,
-                    url = generatedVideoUrl,
-                    title = title,
-                    description = "🎬 Création PANU Studio 8K : $selectedGenre ($selectedDuration)"
-                )
+        if (isGeneratingMedia) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5A93C))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFFE5A93C),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Text(
+                        text = generationProgressText ?: "Génération vidéo IA en cours...",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Production réelle des séquences et encodage MP4.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = {
+        } else if (hasGeneratedMedia && !generatedVideoUrl.isNullOrBlank()) {
+            PanuMediaPlayer(
+                mediaUrl = generatedVideoUrl,
+                title = title,
+                durationLabel = selectedDuration,
+                isVideo = true,
+                onDownload = {
                     MediaDownloadManager.downloadMedia(
                         context = context,
                         url = generatedVideoUrl,
@@ -664,28 +675,88 @@ private fun SeriesCreationTab(
                         mediaType = MediaDownloadManager.MediaType.VIDEO
                     )
                 },
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Télécharger MP4", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-            OutlinedButton(
-                onClick = {
+                onShare = {
                     MediaDownloadManager.shareMedia(
                         context = context,
                         url = generatedVideoUrl,
                         title = title,
                         description = "🎬 Création PANU Studio 8K : $selectedGenre ($selectedDuration)"
                     )
-                },
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Partager", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                OutlinedButton(
+                    onClick = {
+                        MediaDownloadManager.downloadMedia(
+                            context = context,
+                            url = generatedVideoUrl,
+                            title = title,
+                            mediaType = MediaDownloadManager.MediaType.VIDEO
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Télécharger MP4", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = {
+                        MediaDownloadManager.shareMedia(
+                            context = context,
+                            url = generatedVideoUrl,
+                            title = title,
+                            description = "🎬 Création PANU Studio 8K : $selectedGenre ($selectedDuration)"
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Partager", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5A93C).copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MovieFilter,
+                        contentDescription = null,
+                        tint = Color(0xFFE5A93C),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Text(
+                        text = "Aucune vidéo générée",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Sélectionnez votre univers, style et durée ci-dessous, puis cliquez sur « Générer la vidéo » pour lancer la production IA réelle.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
             }
         }
 

@@ -20,8 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Edit
@@ -29,11 +32,14 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -230,9 +236,9 @@ fun PanuDrawerSheetContent(
             Spacer(modifier = Modifier.height(12.dp))
 
             // -------------------------------------------------------------
-            // SECTION 1: 👤 Compte utilisateur
+            // SECTION 1: 👤 Compte utilisateur & Paramètres personnels
             // -------------------------------------------------------------
-            DrawerSectionHeader(title = "Compte utilisateur", icon = Icons.Default.Person)
+            DrawerSectionHeader(title = "Mon Espace", icon = Icons.Default.Person)
 
             if (userProfile != null) {
                 DrawerItem(
@@ -240,6 +246,17 @@ fun PanuDrawerSheetContent(
                     icon = Icons.Default.Person,
                     isSelected = currentRoute == PanuScreen.Profile.route,
                     testTag = "drawer_item_my_profile",
+                    onClick = {
+                        onCloseDrawer()
+                        onNavigate(PanuScreen.Profile.route)
+                    }
+                )
+
+                DrawerItem(
+                    label = "Mes publications",
+                    icon = Icons.Default.Article,
+                    isSelected = false,
+                    testTag = "drawer_item_my_posts",
                     onClick = {
                         onCloseDrawer()
                         onNavigate(PanuScreen.Profile.route)
@@ -297,25 +314,14 @@ fun PanuDrawerSheetContent(
                 )
             }
 
-            DrawerItem(
-                label = "Paramètres de l'application",
-                icon = Icons.Default.Settings,
-                isSelected = currentRoute == PanuScreen.Settings.route,
-                testTag = "drawer_item_settings",
-                onClick = {
-                    onCloseDrawer()
-                    onNavigate(PanuScreen.Settings.route)
-                }
-            )
-
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = colors.surfaceBorder, thickness = 1.dp, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(modifier = Modifier.height(12.dp))
 
             // -------------------------------------------------------------
-            // SECTION 3: 🌐 Liens Publics & Découverte
+            // SECTION 2: 🌐 Navigation Utilisateur
             // -------------------------------------------------------------
-            DrawerSectionHeader(title = "Découvrir", icon = Icons.Default.Public)
+            DrawerSectionHeader(title = "Navigation", icon = Icons.Default.Public)
 
             DrawerItem(
                 label = "Fil d'actualité",
@@ -329,7 +335,7 @@ fun PanuDrawerSheetContent(
             )
 
             DrawerItem(
-                label = "Studio de Création IA & Canva",
+                label = "Studio de Création IA",
                 icon = Icons.Default.AutoAwesome,
                 isSelected = currentRoute == PanuScreen.Studio.route,
                 testTag = "drawer_item_studio",
@@ -340,10 +346,21 @@ fun PanuDrawerSheetContent(
             )
 
             DrawerItem(
-                label = "Lives, Cadeaux & Monétisation",
-                icon = Icons.Default.DynamicFeed,
+                label = "Mes créations",
+                icon = Icons.Default.VideoLibrary,
+                isSelected = currentRoute == PanuScreen.Creations.route,
+                testTag = "drawer_item_creations",
+                onClick = {
+                    onCloseDrawer()
+                    onNavigate(PanuScreen.Creations.route)
+                }
+            )
+
+            DrawerItem(
+                label = "Mes lives & Vidéos direct",
+                icon = Icons.Default.Videocam,
                 isSelected = currentRoute == PanuScreen.LiveSports.route,
-                testTag = "drawer_item_live_gifts",
+                testTag = "drawer_item_live_streams",
                 onClick = {
                     onCloseDrawer()
                     onNavigate(PanuScreen.LiveSports.route)
@@ -351,26 +368,38 @@ fun PanuDrawerSheetContent(
             )
 
             DrawerItem(
-                label = "Vérification Carte (/verify)",
-                icon = Icons.Default.Security,
-                isSelected = currentRoute?.startsWith("verify") == true,
-                testTag = "drawer_item_verify_card",
+                label = "Mes notifications",
+                icon = Icons.Default.Notifications,
+                isSelected = currentRoute == PanuScreen.Activity.route,
+                testTag = "drawer_item_notifications",
                 onClick = {
                     onCloseDrawer()
-                    onNavigate(PanuScreen.VerifyCard.createRoute("PANU-FND-001"))
+                    onNavigate(PanuScreen.Activity.route)
                 }
             )
 
-            DrawerItem(
-                label = "Mes créations",
-                icon = Icons.Default.VideoLibrary,
-                isSelected = currentRoute == PanuScreen.Creations.route || currentRoute == PanuScreen.Activity.route,
-                testTag = "drawer_item_creations",
-                onClick = {
-                    onCloseDrawer()
-                    onNavigate(PanuScreen.Creations.route)
-                }
-            )
+            // -------------------------------------------------------------
+            // SECTION 3: 👑 Espace Fondateur (Strictement Privé & Protégé)
+            // -------------------------------------------------------------
+            if (isFounder) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = colors.surfaceBorder, thickness = 1.dp, modifier = Modifier.padding(horizontal = 20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                DrawerSectionHeader(title = "Administration", icon = Icons.Default.Security, badgeText = "ADMIN")
+
+                DrawerItem(
+                    label = "Tableau de bord Fondateur",
+                    icon = Icons.Default.AdminPanelSettings,
+                    isSelected = currentRoute?.startsWith("founder") == true,
+                    testTag = "drawer_item_founder_dashboard",
+                    highlightTint = colors.champagne,
+                    onClick = {
+                        onCloseDrawer()
+                        onNavigate(PanuScreen.Founder.createRoute("dashboard"))
+                    }
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 

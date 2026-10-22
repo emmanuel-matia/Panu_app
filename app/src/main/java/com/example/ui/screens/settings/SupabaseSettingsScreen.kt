@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
@@ -111,8 +112,8 @@ fun SupabaseSettingsScreen(
     var pinError by remember { mutableStateOf<String?>(null) }
     var isSystemAdminUnlocked by remember { mutableStateOf(false) }
 
-    val isFounderAccount = currentUserEmail?.trim()?.equals("emmanuelmatia150@gmail.com", ignoreCase = true) == true ||
-            currentRole.trim().equals("founder", ignoreCase = true)
+    val isFounderAccount = currentUserEmail?.trim()?.equals("emmanuelmatia150@gmail.com", ignoreCase = true) == true &&
+            (currentRole.trim().equals("founder", ignoreCase = true) || currentRole.trim().equals("admin", ignoreCase = true))
 
     val scope = rememberCoroutineScope()
 
@@ -239,9 +240,10 @@ fun SupabaseSettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ==============================================================================
-            // 🛡️ SECTION SÉCURITÉ : ESPACE ADMINISTRATEUR / FONDATEUR (RBAC & CODE PIN)
+            // 🛡️ SECTION SÉCURITÉ : ESPACE ADMINISTRATEUR / FONDATEUR (STRICTEMENT PRIVÉ)
             // ==============================================================================
-            Card(
+            if (isFounderAccount) {
+                Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("admin_space_card"),
@@ -706,15 +708,12 @@ fun SupabaseSettingsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
-                                val isFounder = isFounderAccount || (currentUserEmail.isNullOrBlank() && adminPinInput == "1974")
-                                if (adminPinInput == "1974" && isFounder) {
+                                if (isFounderAccount) {
                                     showAdminPinDialog = false
                                     isSystemAdminUnlocked = true
                                     onNavigateToFounder()
-                                } else if (adminPinInput != "1974") {
-                                    pinError = "Code PIN incorrect"
                                 } else {
-                                    pinError = "Accès refusé : Réservé exclusivement au compte Fondateur (Emmanuel MATIA). Les administrateurs classiques et utilisateurs ne sont pas autorisés."
+                                    pinError = "Accès refusé : Réservé exclusivement au compte Fondateur vérifié (Emmanuel MATIA). Les utilisateurs non autorisés ne peuvent pas accéder à l'administration."
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
@@ -736,6 +735,92 @@ fun SupabaseSettingsScreen(
                         }
                     }
                 )
+            }
+        } else {
+                // ==============================================================================
+                // 👤 SECTION MON COMPTE & INFORMATIONS PERSONNELLES (UTILISATEURS ORDINAIRES)
+                // ==============================================================================
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("user_account_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.surfaceBorder)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.champagneSubtle),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = colors.champagne)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Mon Compte PANU",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = if (!currentUserId.isNullOrBlank()) (currentUserEmail ?: "Utilisateur connecté") else "Mode Invité (Découverte)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Vos préférences de thème et paramètres personnels sont enregistrés sur votre appareil et synchronisés avec votre profil.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ℹ️ SECTION À PROPOS DE PANU
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("about_app_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.surfaceBorder)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.emeraldSubtle),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Security, contentDescription = null, tint = colors.emerald)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "PANU • Studio Créatif Africain",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = "Version 1.0.0 • Sécurisé par Row Level Security (RLS)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

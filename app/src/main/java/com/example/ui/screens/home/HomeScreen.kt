@@ -104,6 +104,8 @@ import com.example.ui.components.PanuAvatar
 import com.example.ui.components.PanuBottomNav
 import com.example.ui.components.PanuMediaPlayer
 import com.example.ui.components.PanuTopBar
+import com.example.ui.components.SuggestedCreatorsStrip
+import com.example.ui.components.SuggestedCreator
 import com.example.ui.components.TikTokInVideoAdSlide
 import com.example.ui.components.VisibilityBoosterDialog
 import com.example.ui.navigation.PanuScreen
@@ -404,15 +406,15 @@ fun HomeScreen(
                     }
                 }
 
-                // Barre d'onglets : Flux TikTok Vertical, Fil Classique, Lives, Studio, Vérification Carte
-                LazyRow(
+                // Barre d'onglets du fil d'actualité : Pour vous, Tendances
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(tabs) { tab ->
+                    tabs.forEach { tab ->
                         FilterChip(
                             selected = selectedTab == tab,
                             onClick = { selectedTab = tab },
@@ -420,7 +422,7 @@ fun HomeScreen(
                                 Text(
                                     text = if (tab == "Pour vous") "🔥 Pour vous" else "✨ Tendances",
                                     fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 12.sp
+                                    fontSize = 13.sp
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
@@ -428,55 +430,6 @@ fun HomeScreen(
                                 selectedLabelColor = if (colors.isDark) colors.background else Color.White
                             )
                         )
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = onNavigateToLive,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("home_chip_live_gifts")
-                        ) {
-                            Text("🔴 Lives & Cadeaux", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = { onNavigateToVerifyCard("PANU-FND-001") },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("home_chip_verify_card")
-                        ) {
-                            Text("🪪 Vérifier Carte (/verify)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = { showCreditsStoreModal = true },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("home_chip_credits_store")
-                        ) {
-                            Text("🪙 60 Crédits & Mobile Money", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = { showCreatorFundModal = true },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("home_chip_creator_fund")
-                        ) {
-                            Text("💰 Fonds Créateurs (55%)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = onNavigateToVod,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Text("🎬 VOD", fontSize = 12.sp)
-                        }
                     }
                 }
             }
@@ -561,6 +514,11 @@ fun HomeScreen(
                             ) {
                                 Text("🚀 Créer une publication", fontWeight = FontWeight.Bold, color = if (colors.isDark) colors.background else Color.White)
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            CrossPlatformInviteCard(
+                                onInviteClick = { showReferralDialog = true },
+                                onSuggestClick = { showCreatorSuggestionDialog = true }
+                            )
                         }
                     }
                 } else {
@@ -689,6 +647,17 @@ fun HomeScreen(
                 item {
                     InstallAppBanner(
                         onInstallClick = { showInstallDialog = true }
+                    )
+                }
+                item {
+                    SuggestedCreatorsStrip(
+                        creators = listOf(
+                            SuggestedCreator("1", "Marie", "@marie_art"),
+                            SuggestedCreator("2", "Jean", "@jean_tech"),
+                            SuggestedCreator("3", "Fatou", "@fatou_dance")
+                        ),
+                        onNavigateToProfile = { /* TODO */ },
+                        onFollow = { Toast.makeText(context, "Abonnement à $it...", Toast.LENGTH_SHORT).show() }
                     )
                 }
 
@@ -1274,6 +1243,60 @@ fun PostCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textMuted
             )
+        }
+    }
+}
+
+@Composable
+private fun CrossPlatformInviteCard(
+    onInviteClick: () -> Unit,
+    onSuggestClick: () -> Unit
+) {
+    val colors = PanuTheme.colors
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🌟", fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Inviter & Suivre vos créateurs préférés",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        text = "Importez les profils TikTok, Instagram, YouTube, X de vos créateurs et gagnez des bonus !",
+                        fontSize = 11.sp,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onSuggestClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 6.dp)
+                ) {
+                    Text("👥 Suggérer un créateur", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = onInviteClick,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 6.dp)
+                ) {
+                    Text("🔗 Lien de parrainage", color = colors.champagne, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

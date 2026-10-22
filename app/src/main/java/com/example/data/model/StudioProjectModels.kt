@@ -26,7 +26,8 @@ data class StudioMediaClip(
     val filterName: String = "Normal",
     val brightness: Float = 0.0f,
     val contrast: Float = 0.0f,
-    val saturation: Float = 0.0f
+    val saturation: Float = 0.0f,
+    val transition: String = "Fondu enchaîné"
 )
 
 data class StudioTextOverlay(
@@ -41,7 +42,8 @@ data class StudioTextOverlay(
     val yPosRatio: Float = 0.7f,
     val isTitle: Boolean = false,
     val fontStyle: String = "SansSerif",
-    val animation: String = "Fade"
+    val animation: String = "Fade",
+    val textStylePreset: String = "Standard" // Standard, Banner, GoldTitle, Highlight, Neon, Minimal
 )
 
 data class StudioAudioTrack(
@@ -102,4 +104,108 @@ data class StudioProject(
             val audioDuration = audioTracks.maxOfOrNull { it.durationSeconds } ?: 0f
             return maxOf(5.0f, maxOf(clipsDuration, audioDuration))
         }
+}
+
+/**
+ * Convertit un PanuTemplate en un véritable StudioProject complet pré-rempli avec scènes,
+ * calques de textes stylisés, musiques et ratios prêts à être montés dans l'éditeur.
+ */
+fun PanuTemplate.toStudioProject(): StudioProject {
+    val ratio = when (aspectRatio) {
+        "16:9" -> StudioAspectRatio.RATIO_16_9
+        "1:1" -> StudioAspectRatio.RATIO_1_1
+        "4:5" -> StudioAspectRatio.RATIO_4_5
+        else -> StudioAspectRatio.RATIO_9_16
+    }
+
+    val generatedClips = if (scenes.isNotEmpty()) {
+        scenes.mapIndexed { idx, sc ->
+            val dur = maxOf(2f, sc.durationSeconds.toFloat())
+            StudioMediaClip(
+                id = "clip_${id}_${sc.index}_${idx}",
+                uri = if (previewVideoUrl.isNotBlank()) Uri.parse(previewVideoUrl) else Uri.EMPTY,
+                type = if (previewVideoUrl.endsWith(".mp4", ignoreCase = true)) StudioMediaType.VIDEO else StudioMediaType.IMAGE,
+                name = sc.name,
+                durationSeconds = dur,
+                startTrimSeconds = 0f,
+                endTrimSeconds = dur,
+                transition = sc.transition
+            )
+        }
+    } else {
+        listOf(
+            StudioMediaClip(
+                id = "clip_${id}_0",
+                uri = if (previewVideoUrl.isNotBlank()) Uri.parse(previewVideoUrl) else Uri.EMPTY,
+                type = StudioMediaType.IMAGE,
+                name = title,
+                durationSeconds = durationSeconds.toFloat(),
+                startTrimSeconds = 0f,
+                endTrimSeconds = durationSeconds.toFloat()
+            )
+        )
+    }
+
+    val generatedTexts = mutableListOf<StudioTextOverlay>()
+    // Titre d'accroche principal
+    generatedTexts.add(
+        StudioTextOverlay(
+            id = "txt_title_${id}",
+            text = title,
+            startTimeSeconds = 0f,
+            durationSeconds = minOf(4f, durationSeconds.toFloat()),
+            fontSizeSp = 24f,
+            colorHex = "#E5A93C",
+            backgroundHex = "#CC000000",
+            xPosRatio = 0.5f,
+            yPosRatio = 0.22f,
+            isTitle = true,
+            textStylePreset = "GoldTitle"
+        )
+    )
+
+    // Textes de chaque scène
+    var cumulative = 0f
+    scenes.forEachIndexed { idx, sc ->
+        if (sc.defaultText.isNotBlank()) {
+            generatedTexts.add(
+                StudioTextOverlay(
+                    id = "txt_scene_${id}_${idx}",
+                    text = sc.defaultText,
+                    startTimeSeconds = cumulative,
+                    durationSeconds = maxOf(2f, sc.durationSeconds.toFloat()),
+                    fontSizeSp = 18f,
+                    colorHex = "#FFFFFF",
+                    backgroundHex = "#9914151C",
+                    xPosRatio = 0.5f,
+                    yPosRatio = 0.76f,
+                    isTitle = false,
+                    textStylePreset = "Banner"
+                )
+            )
+        }
+        cumulative += sc.durationSeconds
+    }
+
+    val generatedAudio = if (!musicTrack.isNullOrBlank()) {
+        listOf(
+            StudioAudioTrack(
+                id = "audio_${id}",
+                uri = Uri.parse("https://assets.panu.app/audio/preset_${id}.mp3"),
+                title = musicTrack,
+                durationSeconds = durationSeconds.toFloat(),
+                volume = 0.85f
+            )
+        )
+    } else emptyList()
+
+    return StudioProject(
+        id = "proj_${System.currentTimeMillis()}",
+        title = title,
+        aspectRatio = ratio,
+        clips = generatedClips,
+        textOverlays = generatedTexts,
+        audioTracks = generatedAudio,
+        coverThumbnailUrl = thumbnailUrl.ifBlank { null }
+    )
 }

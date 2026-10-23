@@ -117,7 +117,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
   const [postLikesCount, setPostLikesCount] = useState<Record<string, number>>({});
   const [commentsMap, setCommentsMap] = useState<Record<string, PostComment[]>>({});
   const [commentInput, setCommentInput] = useState('');
-  const [userCredits, setUserCredits] = useState<number>(250);
+  const [userCredits, setUserCredits] = useState<number>(0);
 
   // Gestion des abonnements et créateurs
   const [followedCreators, setFollowedCreators] = useState<Record<string, boolean>>({});
@@ -330,6 +330,12 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
           setUserRole('founder');
         } else {
           setUserRole((data.user.user_metadata?.role as any) || 'creator');
+        }
+        if (data.user.id) {
+          supabase.from('ai_credits').select('balance').eq('user_id', data.user.id).maybeSingle()
+            .then(({ data: cred }) => {
+              if (cred?.balance !== undefined && cred?.balance !== null) setUserCredits(cred.balance);
+            });
         }
       }
     });
@@ -1601,14 +1607,6 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
           </div>
         </div>
       )}
-
-      {/* MODALE RECHARGEMENT CINETPAY */}
-      <CinetPayRechargeModal
-        isOpen={showCinetPayModal}
-        onClose={() => setShowCinetPayModal(false)}
-        currentBalance={userCredits}
-        onSuccess={(added) => setUserCredits(prev => prev + added)}
-      />
 
       {/* MODALE DISCUTER AVEC L'IA */}
       <PostAiChatModal

@@ -8,11 +8,8 @@ import ProfilePage from './pages/ProfilePage';
 import LoginPage from './pages/LoginPage';
 import VerifyCardPage from './pages/VerifyCardPage';
 import PaymentPage from './pages/PaymentPage';
+import WatchPostPage from './pages/WatchPostPage';
 
-/**
- * Configuration des routes PANU (Français exclusif)
- * Les barres de navigation et l'entête sont gérés globalement dans App.tsx
- */
 export interface PanuAppRouterProps {
   searchQuery?: string;
 }
@@ -22,6 +19,7 @@ export const PanuAppRouter: React.FC<PanuAppRouterProps> = ({ searchQuery = '' }
     <Routes>
       <Route path="/" element={<HomePage searchQuery={searchQuery} />} />
       <Route path="/home" element={<HomePage searchQuery={searchQuery} />} />
+      <Route path="/watch/:id" element={<WatchPostPage />} />
       <Route path="/studio" element={<StudioPage />} />
       <Route path="/vod" element={<VodPage />} />
       <Route path="/live" element={<LiveSportsPage />} />

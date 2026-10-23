@@ -81,11 +81,11 @@ export const LoginPage: React.FC = () => {
       },
     });
 
-    setOtpSent(true);
     if (error) {
-      setStatusMessage(`Code OTP (${channel.toUpperCase()}) généré en mode local pour ${cleanPhone} (Code : 482910)`);
-      setOtpCode('482910');
+      setStatusMessage(`Erreur : ${error.message}. Vérifiez votre numéro ou réessayez.`);
+      setOtpSent(false);
     } else {
+      setOtpSent(true);
       setStatusMessage(`Code OTP envoyé par ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} au ${cleanPhone} !`);
     }
   };
@@ -102,22 +102,21 @@ export const LoginPage: React.FC = () => {
       type: 'sms',
     });
 
-    await triggerDualSignupConfirmationNotifications({
-      userId: data?.user?.id,
-      userIdentifier: cleanPhone,
-      fullName: fullName.trim() || `Créateur ${cleanPhone.slice(-4)}`,
-      authMethod: methodLabel,
-      referralBy: referralBy || undefined
-    });
-
     if (error) {
-      setStatusMessage(
-        `✅ Compte confirmé via ${methodLabel} (${cleanPhone}) ! Notification de bienvenue envoyée & Alerte Fondateur (${FOUNDER_EMAIL}) transmise.`
-      );
-    } else {
-      setStatusMessage(
-        `✅ Connexion ${methodLabel} réussie ! Notification utilisateur & Alerte Fondateur (${FOUNDER_EMAIL}) envoyées.`
-      );
+      setStatusMessage(`Erreur de vérification : ${error.message}. Vérifiez le code saisi.`);
+      return;
+    }
+
+    if (data?.user) {
+      await triggerDualSignupConfirmationNotifications({
+        userId: data.user.id,
+        userIdentifier: cleanPhone,
+        fullName: fullName.trim() || `Créateur ${cleanPhone.slice(-4)}`,
+        authMethod: methodLabel,
+        referralBy: referralBy || undefined
+      });
+      setStatusMessage(`✅ Connexion ${methodLabel} réussie ! Redirection en cours...`);
+      setTimeout(() => { window.location.href = '/'; }, 800);
     }
   };
 
@@ -148,8 +147,9 @@ export const LoginPage: React.FC = () => {
             referralBy: referralBy || undefined
           });
           setStatusMessage(
-            `🎉 Compte créé ! Notification de confirmation envoyée à ${email.trim()} & Alerte instantanée envoyée au Fondateur (${FOUNDER_EMAIL}).`
+            `🎉 Compte créé ! Redirection en cours...`
           );
+          setTimeout(() => { window.location.href = '/'; }, 800);
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({

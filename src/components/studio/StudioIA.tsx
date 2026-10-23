@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import { useNotifications } from '../../context/NotificationContext';
 
 export interface StudioIAProps {
@@ -12,6 +12,8 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
   const [stylePreset, setStylePreset] = useState('Cinématique 8K');
   const [loading, setLoading] = useState(false);
   const [generatedMedia, setGeneratedMedia] = useState<string | null>(null);
+  const [published, setPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [resolvedUser, setResolvedUser] = useState<{ id: string; email?: string } | null>(currentUser || null);
   const { showToast } = useNotifications();
 
@@ -22,31 +24,26 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           setResolvedUser({ id: session.user.id, email: session.user.email });
-        } else {
-          const guestId = localStorage.getItem('panu_guest_uuid') || '11111111-1111-4111-8111-000000000001';
-          setResolvedUser({ id: guestId });
         }
       });
     }
   }, [currentUser]);
 
-  const handleGenerateAndPublish = async () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) return alert('Veuillez saisir un prompt.');
     const activeUser = resolvedUser || currentUser;
-    if (!activeUser?.id) return alert('Veuillez vous connecter.');
+    if (!activeUser?.id) {
+      showToast('Veuillez vous connecter pour utiliser le Studio IA', 'error');
+      return;
+    }
 
     setLoading(true);
+    setGeneratedMedia(null);
+    setPublished(false);
 
     try {
-      const activeUser = resolvedUser || currentUser;
-      if (!activeUser?.id) {
-        showToast('Veuillez vous connecter pour utiliser le Studio IA', 'error');
-        return;
-      }
-
-      // 0. Vérification et déduction des crédits (5 crédits pour Image, 25 pour Vidéo)
       const CREDIT_COST = mediaType === 'video' ? 25 : 5;
-      
+
       const { data: creditData, error: creditError } = await supabase.rpc('consume_ai_credits', {
         p_user_id: activeUser.id,
         p_amount: CREDIT_COST
@@ -63,46 +60,40 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
         (typeof process !== 'undefined' && process?.env?.FAL_KEY) ||
         (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_FAL_KEY);
 
-
       let mediaUrl: string | null = null;
 
-      const endpoint = mediaType === 'video'
-        ? 'https://fal.run/fal-ai/fast-svd'
-        : 'https://fal.run/fal-ai/flux/schnell';
-
-      const payload = mediaType === 'video'
-        ? { prompt: `${stylePreset}: ${prompt}`, motion_bucket_id: 127, fps: 24 }
-        : { prompt: `${stylePreset}: ${prompt}`, image_size: 'portrait_16_9', num_inference_steps: 4 };
-
       if (falKey) {
-        try {
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              Authorization: `Key ${falKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-          });
+        const endpoint = mediaType === 'video'
+          ? 'https://fal.run/fal-ai/fast-svd'
+          : 'https://fal.run/fal-ai/flux/schnell';
 
-          if (response.ok) {
-            const data = await response.json();
-            if (mediaType === 'video' && data?.video?.url) {
-              mediaUrl = data.video.url;
-            } else if (mediaType === 'image' && data?.images?.[0]?.url) {
-              mediaUrl = data.images[0].url;
-            }
-          } else {
-            const errorText = await response.text();
-            console.error('FAL API Error:', errorText);
-            throw new Error('Erreur de génération via FAL.ai');
+        const payload = mediaType === 'video'
+          ? { prompt: `${stylePreset}: ${prompt}`, motion_bucket_id: 127, fps: 24 }
+          : { prompt: `${stylePreset}: ${prompt}`, image_size: 'portrait_16_9', num_inference_steps: 4 };
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Key ${falKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (mediaType === 'video' && data?.video?.url) {
+            mediaUrl = data.video.url;
+          } else if (mediaType === 'image' && data?.images?.[0]?.url) {
+            mediaUrl = data.images[0].url;
           }
-        } catch (apiErr) {
-          console.error('Fal.ai API Error:', apiErr);
-          throw apiErr;
+        } else {
+          throw new Error('Erreur de génération via FAL.ai');
         }
       } else {
-        throw new Error('Clé API FAL non configurée');
+        showToast('Clé API FAL non configurée. Génération IA indisponible pour le moment.', 'error');
+        setLoading(false);
+        return;
       }
 
       if (!mediaUrl) {
@@ -110,32 +101,44 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
       }
 
       setGeneratedMedia(mediaUrl);
+      showToast(`Génération réussie (-${CREDIT_COST} crédits). Cliquez sur "Publier sur PANU" pour partager.`, 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err?.message || 'Erreur lors de la génération IA.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // 2. Publication automatique dans Supabase `posts`
+  const handlePublish = async () => {
+    const activeUser = resolvedUser || currentUser;
+    if (!activeUser?.id || !generatedMedia) return;
+
+    setPublishing(true);
+    try {
       const { error } = await supabase.from('posts').insert([
         {
           user_id: activeUser.id,
-          title: prompt.substring(0, 50),
-          media_url: mediaUrl,
+          title: prompt.substring(0, 80),
+          content: prompt,
+          media_url: generatedMedia,
           media_type: mediaType,
           prompt_used: prompt,
           is_public: true,
           status: 'published',
-          author_name: 'Créateur PANU', // Valeur par défaut si non résolu
         },
       ]);
 
-      alert(
-        mediaType === 'video'
-          ? '🎬 Vidéo générée et publiée !'
-          : '🖼️ Image générée et publiée !'
-      );
-      showToast(`Génération réussie (-${CREDIT_COST} 🪙)`, 'success');
-    } catch (err) {
-      console.error(err);
-      showToast('Erreur lors de la génération IA.', 'error');
+      if (error) {
+        showToast(`Erreur de publication : ${error.message}`, 'error');
+      } else {
+        setPublished(true);
+        showToast('Publication mise en ligne sur PANU avec succès !', 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Erreur lors de la publication.', 'error');
     } finally {
-      setLoading(false);
+      setPublishing(false);
     }
   };
 
@@ -156,7 +159,6 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
         Studio IA - Génération Vidéo & Image
       </h2>
 
-      {/* SÉLECTEUR DE TYPE DE MÉDIA */}
       <label style={{ fontSize: 13, fontWeight: 700, color: '#DDD', display: 'block', marginBottom: 6 }}>
         1. Type de contenu :
       </label>
@@ -165,15 +167,10 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
           type="button"
           onClick={() => setMediaType('video')}
           style={{
-            flex: 1,
-            padding: '10px',
-            borderRadius: 10,
-            fontWeight: 800,
-            fontSize: 13,
+            flex: 1, padding: '10px', borderRadius: 10, fontWeight: 800, fontSize: 13,
             border: mediaType === 'video' ? '1px solid #E5A93C' : '1px solid #2E3248',
             backgroundColor: mediaType === 'video' ? 'rgba(229, 169, 60, 0.2)' : '#0D0E14',
-            color: mediaType === 'video' ? '#E5A93C' : '#AAA',
-            cursor: 'pointer',
+            color: mediaType === 'video' ? '#E5A93C' : '#AAA', cursor: 'pointer',
           }}
         >
           🎬 Vidéo IA
@@ -182,15 +179,10 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
           type="button"
           onClick={() => setMediaType('image')}
           style={{
-            flex: 1,
-            padding: '10px',
-            borderRadius: 10,
-            fontWeight: 800,
-            fontSize: 13,
+            flex: 1, padding: '10px', borderRadius: 10, fontWeight: 800, fontSize: 13,
             border: mediaType === 'image' ? '1px solid #E5A93C' : '1px solid #2E3248',
             backgroundColor: mediaType === 'image' ? 'rgba(229, 169, 60, 0.2)' : '#0D0E14',
-            color: mediaType === 'image' ? '#E5A93C' : '#AAA',
-            cursor: 'pointer',
+            color: mediaType === 'image' ? '#E5A93C' : '#AAA', cursor: 'pointer',
           }}
         >
           🖼️ Image IA
@@ -217,41 +209,33 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
         placeholder={
           mediaType === 'video'
             ? 'Ex: Métropole Africaine 8K au Coucher du Sol, vue par drone...'
-            : 'Ex: Portrait futuriste d’un guerrier masaï en armure néon 8K...'
+            : "Ex: Portrait futuriste d'un guerrier masaï en armure néon 8K..."
         }
         style={{
-          ...inputStyle,
-          height: '90px',
-          backgroundColor: '#0D0E14',
-          color: '#FFF',
-          borderColor: '#2E3248',
-          resize: 'vertical',
+          ...inputStyle, height: '90px', backgroundColor: '#0D0E14',
+          color: '#FFF', borderColor: '#2E3248', resize: 'vertical',
         }}
       />
 
       <button
         type="button"
-        onClick={handleGenerateAndPublish}
+        onClick={handleGenerate}
         disabled={loading}
         style={{
-          width: '100%',
-          padding: '14px',
+          width: '100%', padding: '14px',
           backgroundColor: loading ? '#555' : '#E5A93C',
-          color: '#000',
-          border: 'none',
-          borderRadius: '10px',
-          fontWeight: 900,
-          fontSize: 14,
+          color: '#000', border: 'none', borderRadius: '10px',
+          fontWeight: 900, fontSize: 14,
           cursor: loading ? 'not-allowed' : 'pointer',
           boxShadow: '0 4px 15px rgba(229, 169, 60, 0.3)',
           transition: 'all 0.2s ease',
         }}
       >
         {loading
-          ? 'Génération & Publication en cours...'
+          ? 'Génération en cours...'
           : mediaType === 'video'
-          ? '✨ Générer Vidéo & Publier sur Accueil'
-          : '✨ Générer Image & Publier sur Accueil'}
+          ? '✨ Générer la Vidéo IA'
+          : '✨ Générer l\'Image IA'}
       </button>
 
       {generatedMedia && (
@@ -271,6 +255,29 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
               alt="Génération AI"
               style={{ width: '100%', borderRadius: '10px', border: '1px solid #2E3248', objectFit: 'cover' }}
             />
+          )}
+
+          {!published ? (
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={publishing}
+              style={{
+                width: '100%', marginTop: 14, padding: '14px',
+                backgroundColor: publishing ? '#555' : '#2ED573',
+                color: '#000', border: 'none', borderRadius: '10px',
+                fontWeight: 900, fontSize: 14,
+                cursor: publishing ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 15px rgba(46, 213, 115, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {publishing ? 'Publication en cours...' : '🚀 Publier sur PANU'}
+            </button>
+          ) : (
+            <div style={{ marginTop: 14, backgroundColor: 'rgba(46,213,115,0.15)', border: '1px solid #2ED573', borderRadius: 10, padding: '12px', textAlign: 'center', color: '#2ED573', fontWeight: 800, fontSize: 13 }}>
+              ✅ Publié sur PANU ! Visible dans le fil d'accueil.
+            </div>
           )}
         </div>
       )}

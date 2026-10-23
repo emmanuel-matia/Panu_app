@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MultiTrackTimeline } from '../components/studio/MultiTrackTimeline';
 import { StudioToolbar, StudioToolId, AspectRatioType, VideoAdjustments } from '../components/studio/StudioToolbar';
 import { VideoExportPanel } from '../components/studio/VideoExportPanel';

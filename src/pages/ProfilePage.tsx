@@ -909,8 +909,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ searchQuery = '' }) =>
       <div style={{ backgroundColor: '#15161F', borderRadius: 14, border: '1px solid rgba(229, 169, 60, 0.3)', padding: 16, marginBottom: 20 }}>
         <h3 style={{ margin: '0 0 6px', color: '#E5A93C', fontSize: 15 }}>🎁 Parrainage & Partage de lien</h3>
         <p style={{ margin: '0 0 10px', fontSize: 12, color: '#AAA' }}>Partagez votre code pour obtenir +50 crédits lors de chaque nouvelle inscription :</p>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0D0E12', padding: 10, borderRadius: 8 }}>
-          <span style={{ fontWeight: 800, color: '#E5A93C' }}>{referralCode}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0D0E12', padding: 10, borderRadius: 8, marginBottom: 10 }}>
+          <span style={{ fontWeight: 800, color: '#E5A93C', fontSize: 13 }}>{referralCode}</span>
           <button
             type="button"
             onClick={() => {
@@ -920,6 +920,38 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ searchQuery = '' }) =>
             style={{ backgroundColor: '#E5A93C', color: '#000', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 800, cursor: 'pointer', fontSize: 12 }}
           >
             Copier
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(`Rejoins PANU Studio, le réseau créatif africain ! Crée ton compte avec mon lien : ${referralLink}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ flex: 1, textAlign: 'center', backgroundColor: '#25D366', color: '#000', border: 'none', padding: '9px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', fontSize: 12, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          >
+            <span>WhatsApp</span>
+          </a>
+          <a
+            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ flex: 1, textAlign: 'center', backgroundColor: '#1877F2', color: '#FFF', border: 'none', padding: '9px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', fontSize: 12, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          >
+            <span>Facebook</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ title: 'PANU Studio', text: 'Rejoins le réseau créatif PANU !', url: referralLink });
+              } else {
+                navigator.clipboard.writeText(referralLink);
+                alert('Lien copié !');
+              }
+            }}
+            style={{ flex: 1, backgroundColor: '#0D0E12', color: '#E5A93C', border: '1px solid #E5A93C', padding: '9px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', fontSize: 12 }}
+          >
+            Plus...
           </button>
         </div>
       </div>
@@ -1008,8 +1040,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ searchQuery = '' }) =>
                 ) : (
                   <div style={{ padding: 10, fontSize: 10, color: '#AAA' }}>{post.title}</div>
                 )}
-                <div style={{ position: 'absolute', bottom: 4, left: 4, display: 'flex', alignItems: 'center', gap: 2, fontSize: 9, color: '#FFF', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                  <span>❤️</span> {post.likes_count || 0}
+                <div style={{ position: 'absolute', bottom: 4, left: 4, right: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 9, color: '#FFF', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>❤️ {post.likes_count || 0}</span>
+                  <a
+                    href={`/watch/${post.id}`}
+                    onClick={(e) => { e.preventDefault(); window.location.href = `/watch/${post.id}`; }}
+                    style={{ color: '#E5A93C', textDecoration: 'none', fontSize: 9, fontWeight: 700 }}
+                    title="Voir et partager"
+                  >
+                    🔗
+                  </a>
                 </div>
               </div>
             ))}

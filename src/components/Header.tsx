@@ -15,13 +15,17 @@ export interface HeaderProps {
   onBalanceUpdate?: (newBalance: number) => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  showMyPublications?: boolean;
+  onToggleMyPublications?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
   userBalance = 250, 
   onBalanceUpdate,
   searchQuery = '',
-  onSearchChange
+  onSearchChange,
+  showMyPublications = false,
+  onToggleMyPublications
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -141,6 +145,22 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2">
           {!isSearchExpanded && (
             <>
+              {/* TOGGLE MES PUBLICATIONS */}
+              <button
+                onClick={onToggleMyPublications}
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
+                  showMyPublications
+                    ? 'bg-amber-500/20 border-amber-500'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title="Filtrer mes publications"
+              >
+                <User className={`w-3.5 h-3.5 ${showMyPublications ? 'text-amber-500' : 'text-gray-400'}`} />
+                <span className={`text-xs font-bold ${showMyPublications ? 'text-white' : 'text-gray-400'}`}>
+                  Mes posts
+                </span>
+              </button>
+
               {/* AFFICHAGE DES CRÉDITS IA */}
               <div 
                 className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer transition-all ${

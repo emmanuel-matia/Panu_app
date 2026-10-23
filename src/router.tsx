@@ -12,13 +12,14 @@ import WatchPostPage from './pages/WatchPostPage';
 
 export interface PanuAppRouterProps {
   searchQuery?: string;
+  showMyPublications?: boolean;
 }
 
-export const PanuAppRouter: React.FC<PanuAppRouterProps> = ({ searchQuery = '' }) => {
+export const PanuAppRouter: React.FC<PanuAppRouterProps> = ({ searchQuery = '', showMyPublications = false }) => {
   return (
     <Routes>
-      <Route path="/" element={<HomePage searchQuery={searchQuery} />} />
-      <Route path="/home" element={<HomePage searchQuery={searchQuery} />} />
+      <Route path="/" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
+      <Route path="/home" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
       <Route path="/watch/:id" element={<WatchPostPage />} />
       <Route path="/studio" element={<StudioPage />} />
       <Route path="/vod" element={<VodPage />} />

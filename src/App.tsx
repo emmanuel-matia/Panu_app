@@ -63,6 +63,7 @@ const LoadingScreen = () => (
 export const App: React.FC = () => {
   const [userCredits, setUserCredits] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMyPublications, setShowMyPublications] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -116,10 +117,12 @@ export const App: React.FC = () => {
               onBalanceUpdate={setUserCredits}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
+              showMyPublications={showMyPublications}
+              onToggleMyPublications={() => setShowMyPublications(!showMyPublications)}
             />
 
             <main className="flex-grow pb-24">
-              <PanuAppRouter searchQuery={searchQuery} />
+              <PanuAppRouter searchQuery={searchQuery} showMyPublications={showMyPublications} />
             </main>
 
             <PanuBottomNav />
@@ -131,3 +134,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

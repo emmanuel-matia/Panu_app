@@ -22,6 +22,8 @@ import {
 } from '../services/commentService';
 import { toggleFollow, fetchFollowingIds, subscribeToRealtimeFollows } from '../services/followService';
 import { useNotifications } from '../context/NotificationContext';
+import { StoriesCarousel } from '../components/feed/StoriesCarousel';
+
 
 export interface FeedVideoPost {
   id: string;
@@ -59,9 +61,10 @@ export interface PostComment {
  */
 export interface HomePageProps {
   searchQuery?: string;
+  showMyPublications?: boolean;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
+export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPublications = false }) => {
   const [posts, setPosts] = useState<FeedVideoPost[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userRole, setUserRole] = useState<'founder' | 'admin' | 'creator' | 'user'>('user');
@@ -80,6 +83,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
 
   // Filtrage des publications en temps réel selon l'auteur ou le mot-clé et la catégorie de création
   const filteredPosts = posts.filter(post => {
+    if (showMyPublications && post.user_id !== currentUserId) return false;
     if (selectedDomainFilter !== 'Tous') {
       const matchDomain = (post.title || '').toLowerCase().includes(selectedDomainFilter.toLowerCase()) ||
                           (post.content || '').toLowerCase().includes(selectedDomainFilter.toLowerCase());
@@ -97,6 +101,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
   // Onglet actif : [🔥 Pour vous] [✨ Tendances] (Interface épurée style TikTok)
   const [activeTab, setActiveTab] = useState<'for_you' | 'trending'>('for_you');
   const [sortBy, setSortBy] = useState<'recent' | 'likes' | 'comments'>('recent');
+  const [showMyPublications, setShowMyPublications] = useState(false);
 
   // Modales interactives
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
@@ -1085,6 +1090,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
         {/* ============================================================================== */}
         {activeTab === 'for_you' || activeTab === 'trending' ? (
           <div>
+            <StoriesCarousel />
             <LiveFeed />
             <PanuShortsFeedPlayer
               posts={filteredPosts}

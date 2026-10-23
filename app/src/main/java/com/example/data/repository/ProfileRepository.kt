@@ -100,4 +100,36 @@ class ProfileRepository(
     suspend fun autoFollowFounder(userId: String): Result<Unit> {
         return profileService.autoFollowFounder(userId)
     }
+
+    private val followedCache = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    fun isUserFollowed(followingId: String): Boolean = followedCache.contains(followingId)
+
+    suspend fun fetchFollowedIds(userId: String): Set<String> {
+        val res = profileService.getFollowedIds(userId)
+        if (res.isSuccess) {
+            val set = res.getOrNull() ?: emptySet()
+            followedCache.addAll(set)
+            return followedCache
+        }
+        return followedCache
+    }
+
+    suspend fun toggleFollow(followerId: String, followingId: String): Result<Boolean> {
+        if (followedCache.contains(followingId)) {
+            followedCache.remove(followingId)
+            val res = profileService.unfollowUser(followerId, followingId)
+            return if (res.isSuccess) Result.success(false) else {
+                followedCache.add(followingId)
+                Result.failure(res.exceptionOrNull() ?: Exception("Erreur désabonnement"))
+            }
+        } else {
+            followedCache.add(followingId)
+            val res = profileService.followUser(followerId, followingId)
+            return if (res.isSuccess) Result.success(true) else {
+                followedCache.remove(followingId)
+                Result.failure(res.exceptionOrNull() ?: Exception("Erreur abonnement"))
+            }
+        }
+    }
 }

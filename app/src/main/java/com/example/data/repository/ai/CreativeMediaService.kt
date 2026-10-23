@@ -34,6 +34,8 @@ data class GeneratedMediaResult(
     val prompt: String,
     val segments: List<VideoSequenceSegment> = emptyList(),
     val voiceOverText: String? = null,
+    val soundtrackUrl: String? = null,
+    val soundtrackTitle: String? = null,
     val isMultiSegment: Boolean = false
 )
 
@@ -91,7 +93,8 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                     stylePreset = stylePreset,
                     engine = aiEngine
                 )
-                onProgress("Vidéo générée avec succès (${durationLabel}) !", 1.0f)
+                val soundtrack = PanuMediaConstants.getRecommendedSoundtrack(stylePreset)
+                onProgress("Vidéo générée avec succès (${durationLabel}) • Bande-son « ${soundtrack.title} » associée !", 1.0f)
                 Result.success(
                     GeneratedMediaResult(
                         mediaUrl = directVideoResult.first,
@@ -101,6 +104,8 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                         durationLabel = durationLabel,
                         title = title,
                         prompt = prompt,
+                        soundtrackUrl = soundtrack.audioUrl,
+                        soundtrackTitle = soundtrack.title,
                         isMultiSegment = false
                     )
                 )
@@ -154,7 +159,8 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
 
                 val finalVideoUrl = segments.firstOrNull()?.videoUrl ?: throw IllegalStateException("La génération a échoué. Réessayer.")
 
-                onProgress("Production complète générée (${durationLabel}) !", 1.0f)
+                val soundtrack = PanuMediaConstants.getRecommendedSoundtrack(stylePreset)
+                onProgress("Production complète générée (${durationLabel}) • Bande-son « ${soundtrack.title} » associée !", 1.0f)
                 Result.success(
                     GeneratedMediaResult(
                         mediaUrl = finalVideoUrl,
@@ -166,6 +172,8 @@ class CreativeMediaService(private val sessionManager: SessionManager) {
                         prompt = prompt,
                         segments = segments,
                         voiceOverText = "Narration assemblée.",
+                        soundtrackUrl = soundtrack.audioUrl,
+                        soundtrackTitle = soundtrack.title,
                         isMultiSegment = true
                     )
                 )

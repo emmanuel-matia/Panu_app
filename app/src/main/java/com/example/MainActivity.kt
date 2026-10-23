@@ -297,6 +297,8 @@ fun PanuAppNavHost(container: PanuAppContainer) {
             composable(PanuScreen.Home.route) {
                 HomeScreen(
                     postRepository = container.postRepository,
+                    profileRepository = container.profileRepository,
+                    currentUserId = currentUserId,
                     featuresService = container.panuFeaturesService,
                     geminiRepository = container.geminiRepository,
                     isLoggedIn = isUserLoggedIn,

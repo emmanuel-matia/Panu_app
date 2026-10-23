@@ -105,4 +105,24 @@ class PostRepository(
     suspend fun updateLikes(postId: String, newCount: Int): Result<Unit> {
         return postService.updateLikesCount(postId, newCount)
     }
+
+    private val commentsCache = java.util.concurrent.ConcurrentHashMap<String, MutableList<com.example.data.model.PostComment>>()
+
+    suspend fun getComments(postId: String): List<com.example.data.model.PostComment> {
+        val cached = commentsCache[postId]
+        val remoteRes = postService.getPostComments(postId)
+        if (remoteRes.isSuccess) {
+            val remoteList = remoteRes.getOrNull() ?: emptyList()
+            val merged = (cached ?: emptyList()) + remoteList.filter { r -> cached?.none { it.id == r.id } ?: true }
+            commentsCache[postId] = merged.toMutableList()
+            return merged
+        }
+        return cached ?: emptyList()
+    }
+
+    suspend fun addComment(comment: com.example.data.model.PostComment): Result<com.example.data.model.PostComment> {
+        val list = commentsCache.getOrPut(comment.postId) { mutableListOf() }
+        list.add(0, comment)
+        return postService.addPostComment(comment)
+    }
 }

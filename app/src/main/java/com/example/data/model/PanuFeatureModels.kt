@@ -251,3 +251,14 @@ data class LiveMatchStream(
     val streamerName: String,
     val isLive: Boolean = true
 )
+
+// 8. Modèle de Transaction de Retrait Fonds Créateurs (table creator_payouts)
+data class PayoutTransaction(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val reference: String,
+    val amountFcfa: Double,
+    val provider: PaymentProvider,
+    val accountIdentifier: String,
+    val status: String = "EFFECTUÉ",
+    val timestamp: String = "À l'instant"
+)

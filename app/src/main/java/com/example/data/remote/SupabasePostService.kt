@@ -1,6 +1,7 @@
 package com.example.data.remote
 
 import com.example.data.model.Post
+import com.example.data.model.PostComment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -27,7 +28,7 @@ class SupabasePostService(private val client: SupabaseClient) {
     }
 
     suspend fun getCanvasProjectsAsPosts(): Result<List<Post>> = withContext(Dispatchers.IO) {
-        val endpoint = "/rest/v1/canvas_projects?order=updated_at.desc&select=id,user_id,title,exportFormat,previewUrl,updated_at,profiles(full_name,username,avatar_url)"
+        val endpoint = "/rest/v1/canvas_projects?order=updated_at.desc&select=id,user_id,title,export_format,exportFormat,preview_url,previewUrl,layers_json,updated_at,profiles(full_name,username,avatar_url)"
         when (val response = client.execute(endpoint)) {
             is SupabaseResponse.Success -> {
                 val array = response.asJsonArray() ?: JSONArray()
@@ -37,8 +38,15 @@ class SupabasePostService(private val client: SupabaseClient) {
                     val id = obj.optString("id")
                     val userId = obj.optString("user_id")
                     val title = obj.optString("title", "Création Studio PANU")
-                    val exportFormat = obj.optString("exportFormat", "MP4")
-                    val previewUrl = obj.optString("previewUrl").takeIf { it.isNotBlank() }
+                    val exportFormat = obj.optString("export_format", "")
+                        .ifBlank { obj.optString("exportFormat", "MP4") }
+                    val layersJson = obj.optJSONArray("layers_json")
+                    val layerFirstUrl = if (layersJson != null && layersJson.length() > 0) {
+                        layersJson.optJSONObject(0)?.optString("content")?.takeIf { it.startsWith("http") }
+                    } else null
+                    val previewUrl = obj.optString("preview_url", "")
+                        .ifBlank { obj.optString("previewUrl", "") }
+                        .takeIf { it.isNotBlank() } ?: layerFirstUrl
                     val profilesObj = obj.optJSONObject("profiles")
 
                     val mediaType = if (exportFormat.equals("MP4", ignoreCase = true) || (previewUrl?.endsWith(".mp4", ignoreCase = true) == true)) "video" else "image"
@@ -48,10 +56,10 @@ class SupabasePostService(private val client: SupabaseClient) {
                             id = "canvas_$id",
                             authorId = userId,
                             authorName = profilesObj?.optString("full_name")?.takeIf { it.isNotBlank() } ?: "Créateur PANU",
-                            authorUsername = profilesObj?.optString("username")?.takeIf { it.isNotBlank() } ?: "createur",
+                            authorUsername = profilesObj?.optString("username")?.takeIf { it.isNotBlank() } ?: "createur_panu",
                             authorAvatarUrl = profilesObj?.optString("avatar_url"),
                             title = title,
-                            content = "Nouvelle création réalisée avec le Studio IA PANU ($exportFormat)",
+                            content = "Nouvelle création Studio PANU ($exportFormat)",
                             mediaUrl = previewUrl,
                             mediaType = mediaType,
                             status = "published",
@@ -169,6 +177,55 @@ class SupabasePostService(private val client: SupabaseClient) {
             is SupabaseResponse.Success -> Result.success(Unit)
             is SupabaseResponse.Error -> Result.failure(Exception(response.message))
             is SupabaseResponse.NetworkError -> Result.failure(Exception(response.message))
+        }
+    }
+
+    suspend fun getPostComments(postId: String): Result<List<PostComment>> = withContext(Dispatchers.IO) {
+        val endpoint = "/rest/v1/post_comments?post_id=eq.$postId&order=created_at.asc&select=*"
+        when (val response = client.execute(endpoint)) {
+            is SupabaseResponse.Success -> {
+                val array = response.asJsonArray() ?: JSONArray()
+                val list = mutableListOf<PostComment>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    list.add(
+                        PostComment(
+                            id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                            postId = obj.optString("post_id", postId),
+                            authorId = obj.optString("author_id", "user"),
+                            authorName = obj.optString("author_name", "Membre PANU"),
+                            authorUsername = obj.optString("author_username", "membre"),
+                            authorAvatarUrl = obj.optString("author_avatar_url").takeIf { it.isNotBlank() },
+                            content = obj.optString("content", ""),
+                            likesCount = obj.optInt("likes_count", 0),
+                            createdAt = obj.optString("created_at", "Récemment").take(16).replace("T", " ")
+                        )
+                    )
+                }
+                Result.success(list)
+            }
+            is SupabaseResponse.Error -> Result.failure(Exception(response.message))
+            is SupabaseResponse.NetworkError -> Result.failure(Exception(response.message))
+        }
+    }
+
+    suspend fun addPostComment(comment: PostComment): Result<PostComment> = withContext(Dispatchers.IO) {
+        val payload = JSONObject().apply {
+            put("id", comment.id)
+            put("post_id", comment.postId)
+            put("author_id", comment.authorId)
+            put("author_name", comment.authorName)
+            comment.authorUsername?.let { put("author_username", it) }
+            comment.authorAvatarUrl?.let { put("author_avatar_url", it) }
+            put("content", comment.content)
+            put("likes_count", 0)
+        }
+        val endpoint = "/rest/v1/post_comments"
+        val headers = mapOf("Prefer" to "return=representation")
+        when (val response = client.execute(endpoint, method = "POST", jsonBody = payload.toString(), headers = headers)) {
+            is SupabaseResponse.Success -> Result.success(comment)
+            is SupabaseResponse.Error -> Result.success(comment) // optimistic fallback
+            is SupabaseResponse.NetworkError -> Result.success(comment)
         }
     }
 

@@ -2,6 +2,8 @@ package com.example.ui.screens.home
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
@@ -48,15 +51,18 @@ import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Close
 import com.example.data.repository.GeminiRepository
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedTextField
+import com.example.data.repository.ProfileRepository
 import com.example.ui.components.CreatorSuggestionDialog
+import com.example.ui.components.PanuCommentsBottomSheet
+import com.example.ui.components.PanuGiftDialog
 import com.example.ui.components.PanuWatermarkExporterDialog
 import com.example.ui.components.ReferralProgramDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -121,6 +127,8 @@ private val DEFAULT_VIRAL_TIKTOK_POSTS = emptyList<Post>()
 @Composable
 fun HomeScreen(
     postRepository: PostRepository,
+    profileRepository: ProfileRepository? = null,
+    currentUserId: String? = null,
     featuresService: SupabasePanuFeaturesService? = null,
     geminiRepository: GeminiRepository? = null,
     isLoggedIn: Boolean = false,
@@ -163,8 +171,17 @@ fun HomeScreen(
     var isSearchingWithGemini by remember { mutableStateOf(false) }
     var semanticSearchResults by remember { mutableStateOf<List<Post>?>(null) }
 
-    val displayedPosts = remember(posts, semanticSearchResults) {
-        semanticSearchResults ?: posts
+    var selectedCategory by remember { mutableStateOf("Tous") }
+
+    val displayedPosts = remember(posts, semanticSearchResults, selectedCategory) {
+        val base = semanticSearchResults ?: posts
+        if (selectedCategory == "Tous") {
+            base
+        } else {
+            base.filter { post ->
+                getPostCategory(post).equals(selectedCategory, ignoreCase = true)
+            }
+        }
     }
 
     // Par défaut : Flux Vertical Vidéos Virales en lecture automatique
@@ -183,9 +200,21 @@ fun HomeScreen(
     val likedPosts = remember { mutableStateMapOf<String, Boolean>() }
     val likesCount = remember { mutableStateMapOf<String, Int>() }
 
+    // Abonnements dynamiques & interactions temps réel
+    val followedCreators = remember { mutableStateMapOf<String, Boolean>() }
+    var activeCommentPost by remember { mutableStateOf<Post?>(null) }
+    var giftTargetPost by remember { mutableStateOf<Post?>(null) }
+
     LaunchedEffect(Unit) {
         launch(kotlinx.coroutines.Dispatchers.IO) { postRepository.refreshPublishedPosts() }
         launch(kotlinx.coroutines.Dispatchers.IO) { featuresService?.fetchUserNotifications() }
+    }
+
+    LaunchedEffect(currentUserId) {
+        if (!currentUserId.isNullOrBlank()) {
+            val ids = profileRepository?.fetchFollowedIds(currentUserId) ?: emptySet()
+            ids.forEach { followedCreators[it] = true }
+        }
     }
 
     AuthRequiredDialog(
@@ -251,7 +280,7 @@ fun HomeScreen(
 
     ReferralProgramDialog(
         isOpen = showReferralDialog,
-        userId = if (isLoggedIn) "createur_actif" else "guest",
+        userId = if (isLoggedIn) (currentUserId ?: "createur_actif") else "guest",
         username = null,
         onDismiss = { showReferralDialog = false }
     )
@@ -265,6 +294,30 @@ fun HomeScreen(
         )
     }
 
+    activeCommentPost?.let { p ->
+        PanuCommentsBottomSheet(
+            post = p,
+            postRepository = postRepository,
+            featuresService = featuresService,
+            isLoggedIn = isLoggedIn,
+            onNavigateToAuth = onNavigateToAuth,
+            onDismiss = { activeCommentPost = null }
+        )
+    }
+
+    giftTargetPost?.let { p ->
+        PanuGiftDialog(
+            isOpen = true,
+            post = p,
+            featuresService = featuresService,
+            onOpenRechargeModal = {
+                giftTargetPost = null
+                showCreditsStoreModal = true
+            },
+            onDismiss = { giftTargetPost = null }
+        )
+    }
+
     fun handleInteractionGated(actionLabel: String, onAllowed: () -> Unit) {
         if (!isLoggedIn) {
             currentBlockedAction = actionLabel
@@ -274,10 +327,55 @@ fun HomeScreen(
         }
     }
 
+    fun handleToggleFollow(authorId: String, authorHandle: String) {
+        handleInteractionGated("s'abonner à ce créateur") {
+            val uid = currentUserId ?: "guest"
+            val currentlyFollowed = followedCreators[authorId] == true
+            followedCreators[authorId] = !currentlyFollowed
+            scope.launch {
+                val res = profileRepository?.toggleFollow(uid, authorId)
+                if (res != null && res.isSuccess) {
+                    val newStatus = res.getOrNull() == true
+                    followedCreators[authorId] = newStatus
+                    Toast.makeText(
+                        context,
+                        if (newStatus) "Abonné à @$authorHandle !" else "Désabonné de @$authorHandle",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    followedCreators[authorId] = currentlyFollowed
+                    Toast.makeText(context, "Erreur lors de la mise à jour de l'abonnement", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    fun sharePost(post: Post) {
+        featuresService?.recordShareOrViewRemuneration(isShare = true)
+        try {
+            val sendIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, "Regardez cette vidéo sur PANU : ${post.title ?: "Création PANU"} — ${post.mediaUrl ?: "https://panu.app"}")
+                type = "text/plain"
+            }
+            val shareIntent = Intent.createChooser(sendIntent, "Partager la vidéo PANU")
+            context.startActivity(shareIntent)
+        } catch (_: Exception) {
+            watermarkExportPost = post
+        }
+    }
+
     Scaffold(
         topBar = {
             Column {
                 PanuTopBar(
+                    featuresService = featuresService,
+                    onCreditsClick = { showCreditsStoreModal = true },
+                    onCreateClick = {
+                        handleInteractionGated("créer une publication") {
+                            onNavigateToCreate()
+                        }
+                    },
                     onSearchClick = {
                         isSearchActive = !isSearchActive
                         if (!isSearchActive) {
@@ -432,6 +530,41 @@ fun HomeScreen(
                         )
                     }
                 }
+
+                // Filtres rapides de catégories dynamiques : Tous, Design, Vidéo, AI Art
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val categories = listOf("Tous", "Design", "Vidéo", "AI Art")
+                    items(categories) { cat ->
+                        val isSelected = selectedCategory == cat
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = cat },
+                            label = {
+                                Text(
+                                    text = when(cat) {
+                                        "Design" -> "🎨 Design"
+                                        "Vidéo" -> "🎬 Vidéo"
+                                        "AI Art" -> "✨ AI Art"
+                                        else -> "🌟 Tous"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = if (colors.isDark) colors.background else Color.White,
+                                containerColor = colors.surfaceElevated,
+                                labelColor = colors.textPrimary
+                            )
+                        )
+                    }
+                }
             }
         },
         bottomBar = {
@@ -440,21 +573,6 @@ fun HomeScreen(
                 isFounder = isFounder,
                 onNavigate = onNavigate
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    handleInteractionGated("créer une publication") {
-                        onNavigateToCreate()
-                    }
-                },
-                containerColor = colors.champagne,
-                contentColor = if (colors.isDark) colors.background else Color.White,
-                shape = CircleShape,
-                modifier = Modifier.testTag("home_fab_create")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Créer du contenu")
-            }
         },
         containerColor = colors.background
     ) { padding ->
@@ -468,53 +586,44 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 48.dp)
                             .testTag("home_empty_posts_for_you"),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            verticalArrangement = Arrangement.spacedBy(32.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Surface(
                                 shape = CircleShape,
                                 color = colors.champagne.copy(alpha = 0.15f),
                                 border = androidx.compose.foundation.BorderStroke(2.dp, colors.champagne),
-                                modifier = Modifier.size(76.dp)
+                                modifier = Modifier.size(88.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text("🎬", fontSize = 34.sp)
+                                    Text("🎬", fontSize = 38.sp)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Aucune publication pour le moment",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 18.sp,
-                                color = colors.champagne,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Soyez le premier à créer un contenu !",
-                                color = colors.textSecondary,
-                                fontSize = 13.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Button(
-                                onClick = {
-                                    handleInteractionGated("créer une publication") {
-                                        onNavigateToCreate()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.testTag("btn_empty_create_post")
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("🚀 Créer une publication", fontWeight = FontWeight.Bold, color = if (colors.isDark) colors.background else Color.White)
+                                Text(
+                                    text = "Aucune publication pour le moment",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 19.sp,
+                                    color = colors.champagne,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Text(
+                                    text = "Soyez le premier à créer un contenu !",
+                                    color = colors.textSecondary,
+                                    fontSize = 14.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
                             CrossPlatformInviteCard(
                                 onInviteClick = { showReferralDialog = true },
                                 onSuggestClick = { showCreatorSuggestionDialog = true }
@@ -571,9 +680,13 @@ fun HomeScreen(
                                 post = post,
                                 isLiked = isLiked,
                                 likesCount = currentLikes,
+                                isFollowed = followedCreators[post.authorId] == true,
                                 onAuthorClick = {
                                     val handle = post.authorUsername ?: post.authorName ?: ""
                                     if (handle.isNotBlank()) onOpenPublicProfile(handle)
+                                },
+                                onToggleFollow = {
+                                    handleToggleFollow(post.authorId, post.authorUsername ?: post.authorName ?: "createur")
                                 },
                                 onWatchFullVideo = {
                                     val url = post.mediaUrl ?: ""
@@ -602,29 +715,22 @@ fun HomeScreen(
                             },
                             onCommentClick = {
                                 handleInteractionGated("commenter") {
-                                    Toast.makeText(context, "💬 Espace commentaires ouvert", Toast.LENGTH_SHORT).show()
+                                    activeCommentPost = post
                                 }
                             },
                             onGiftClick = {
                                 handleInteractionGated("offrir un cadeau") {
-                                    val roseGift = featuresService?.liveGiftsCatalog?.firstOrNull()
-                                    if (roseGift != null) {
-                                        scope.launch {
-                                            featuresService.sendLiveGift(
-                                                streamId = post.id,
-                                                receiverName = post.authorName ?: "Créateur PANU",
-                                                gift = roseGift
-                                            )
-                                        }
-                                    }
+                                    giftTargetPost = post
                                 }
+                            },
+                            onRemixClick = {
+                                onNavigateToStudio()
                             },
                             onBoostClick = {
                                 boostTargetPost = post
                             },
                             onShareClick = {
-                                featuresService?.recordShareOrViewRemuneration(isShare = true)
-                                watermarkExportPost = post
+                                sharePost(post)
                             },
                             onCreateClick = {
                                 handleInteractionGated("créer une vidéo") {
@@ -652,12 +758,12 @@ fun HomeScreen(
                 item {
                     SuggestedCreatorsStrip(
                         creators = listOf(
-                            SuggestedCreator("1", "Marie", "@marie_art"),
-                            SuggestedCreator("2", "Jean", "@jean_tech"),
-                            SuggestedCreator("3", "Fatou", "@fatou_dance")
+                            SuggestedCreator("1", "Marie Art", "@marie_art"),
+                            SuggestedCreator("2", "Jean Tech", "@jean_tech"),
+                            SuggestedCreator("3", "Fatou Dance", "@fatou_dance")
                         ),
-                        onNavigateToProfile = { /* TODO */ },
-                        onFollow = { Toast.makeText(context, "Abonnement à $it...", Toast.LENGTH_SHORT).show() }
+                        onNavigateToProfile = { handle -> onOpenPublicProfile(handle) },
+                        onFollow = { handle -> handleToggleFollow(handle, handle) }
                     )
                 }
 
@@ -744,9 +850,13 @@ fun HomeScreen(
                             post = post,
                             isLiked = isLiked,
                             likesCount = currentCount,
+                            isFollowed = followedCreators[post.authorId] == true,
                             onAuthorClick = {
                                 val handle = post.authorUsername ?: post.authorName ?: ""
                                 if (handle.isNotBlank()) onOpenPublicProfile(handle)
+                            },
+                            onToggleFollow = {
+                                handleToggleFollow(post.authorId, post.authorUsername ?: post.authorName ?: "createur")
                             },
                             onVideoClick = { videoUrl ->
                                 featuresService?.recordShareOrViewRemuneration(isShare = false)
@@ -772,26 +882,16 @@ fun HomeScreen(
                             },
                             onCommentClick = {
                                 handleInteractionGated("commenter") {
-                                    Toast.makeText(context, "Espace commentaires ouvert", Toast.LENGTH_SHORT).show()
+                                    activeCommentPost = post
                                 }
                             },
                             onGiftClick = {
                                 handleInteractionGated("offrir un cadeau") {
-                                    val rose = featuresService?.liveGiftsCatalog?.firstOrNull()
-                                    if (rose != null) {
-                                        scope.launch {
-                                            featuresService.sendLiveGift(post.id, post.authorName ?: "Créateur PANU", rose)
-                                        }
-                                    }
+                                    giftTargetPost = post
                                 }
                             },
                             onShareClick = {
-                                featuresService?.recordShareOrViewRemuneration(isShare = true)
-                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, "Regardez cette vidéo sur PANU : ${post.title ?: post.content}")
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "Partager via"))
+                                sharePost(post)
                             }
                         )
                     }
@@ -806,14 +906,18 @@ private fun TikTokVerticalVideoItem(
     post: Post,
     isLiked: Boolean,
     likesCount: Int,
+    isFollowed: Boolean = false,
     onAuthorClick: () -> Unit,
+    onToggleFollow: () -> Unit = {},
     onWatchFullVideo: () -> Unit,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onGiftClick: () -> Unit,
+    onRemixClick: () -> Unit = {},
     onBoostClick: () -> Unit = {},
     onShareClick: () -> Unit,
-    onCreateClick: () -> Unit
+    onCreateClick: () -> Unit,
+    onCategoryClick: (String) -> Unit = {}
 ) {
     val colors = PanuTheme.colors
 
@@ -847,20 +951,43 @@ private fun TikTokVerticalVideoItem(
                 )
         )
 
-        // Colonne d'actions interactives à droite (Style TikTok : Aimer, Commenter, Cadeau, Partager, Studio IA)
+        // Colonne d'actions interactives à droite (Style TikTok : Avatar+Follow, Aimer, Commenter, Cadeau, Remixer, Booster, Partager, Studio IA)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 14.dp, bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            PanuAvatar(
-                avatarUrl = post.authorAvatarUrl,
-                fullName = post.authorName ?: "PANU",
-                size = 50.dp,
-                onClick = onAuthorClick
-            )
+            // Avatar avec badge "+" ou "✓" pour suivre en 1-clic
+            Box(
+                contentAlignment = Alignment.BottomCenter,
+                modifier = Modifier.padding(bottom = 6.dp)
+            ) {
+                PanuAvatar(
+                    avatarUrl = post.authorAvatarUrl,
+                    fullName = post.authorName ?: "PANU",
+                    size = 50.dp,
+                    onClick = onAuthorClick
+                )
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(if (isFollowed) Color(0xFF2ED573) else colors.champagne)
+                        .border(1.5.dp, Color.Black, CircleShape)
+                        .clickable { onToggleFollow() }
+                        .testTag("avatar_follow_btn_${post.id}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isFollowed) Icons.Default.Check else Icons.Default.Add,
+                        contentDescription = if (isFollowed) "Abonné" else "Suivre",
+                        tint = if (isFollowed) Color.White else Color.Black,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
 
             // Bouton Aimer
             TikTokActionSideButton(
@@ -887,6 +1014,15 @@ private fun TikTokVerticalVideoItem(
                 label = "Cadeau 🌹",
                 testTag = "tiktok_gift_btn_${post.id}",
                 onClick = onGiftClick
+            )
+
+            // Bouton Remixer / Utiliser le son & modèle IA
+            TikTokActionSideButton(
+                icon = Icons.Default.MusicNote,
+                tint = colors.champagne,
+                label = "Remixer",
+                testTag = "tiktok_remix_btn_${post.id}",
+                onClick = onRemixClick
             )
 
             // Bouton Booster de Visibilité dans Découvrir
@@ -921,27 +1057,49 @@ private fun TikTokVerticalVideoItem(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .fillMaxWidth(0.78f)
+                .fillMaxWidth(0.76f)
                 .padding(start = 16.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { onAuthorClick() }
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "@${post.authorUsername ?: "createur_panu"}",
-                    color = colors.champagne,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 15.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    Icons.Default.VerifiedUser,
-                    contentDescription = "Vérifié",
-                    tint = colors.champagne,
-                    modifier = Modifier.size(16.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onAuthorClick() }
+                ) {
+                    Text(
+                        text = "@${post.authorUsername ?: "createur_panu"}",
+                        color = colors.champagne,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        Icons.Default.VerifiedUser,
+                        contentDescription = "Vérifié",
+                        tint = colors.champagne,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onToggleFollow() }
+                        .testTag("follow_pill_btn_${post.id}"),
+                    color = if (isFollowed) Color.White.copy(alpha = 0.25f) else colors.champagne,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (isFollowed) "Abonné ✓" else "+ Suivre",
+                        color = if (isFollowed) Color.White else Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                    )
+                }
             }
 
             if (!post.title.isNullOrBlank()) {
@@ -962,6 +1120,29 @@ private fun TikTokVerticalVideoItem(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
+
+            val postCategory = getPostCategory(post)
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onCategoryClick(postCategory) }
+                    .testTag("category_badge_${post.id}"),
+                color = colors.champagne.copy(alpha = 0.25f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne.copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = when(postCategory) {
+                        "Design" -> "🎨 Design"
+                        "Vidéo" -> "🎬 Vidéo"
+                        else -> "✨ AI Art"
+                    },
+                    color = colors.champagne,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -1054,12 +1235,15 @@ fun PostCard(
     post: Post,
     isLiked: Boolean = false,
     likesCount: Int = post.likesCount,
+    isFollowed: Boolean = false,
     onAuthorClick: () -> Unit,
+    onToggleFollow: () -> Unit = {},
     onVideoClick: (String) -> Unit = {},
     onLikeClick: () -> Unit = {},
     onCommentClick: () -> Unit = {},
     onGiftClick: () -> Unit = {},
-    onShareClick: () -> Unit = {}
+    onShareClick: () -> Unit = {},
+    onCategoryClick: (String) -> Unit = {}
 ) {
     val colors = PanuTheme.colors
 
@@ -1097,6 +1281,24 @@ fun PostCard(
                     )
                 }
                 Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onToggleFollow() }
+                        .testTag("postcard_follow_btn_${post.id}"),
+                    color = if (isFollowed) colors.surfaceElevated else colors.champagne.copy(alpha = 0.18f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isFollowed) colors.surfaceBorder else colors.champagne),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isFollowed) "Abonné ✓" else "+ Suivre",
+                        color = if (isFollowed) colors.textSecondary else colors.champagne,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Surface(
                     shape = RoundedCornerShape(6.dp),
                     color = colors.surfaceElevated
                 ) {
@@ -1127,6 +1329,30 @@ fun PostCard(
                     text = post.title,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = colors.textPrimary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            val postCategory = getPostCategory(post)
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onCategoryClick(postCategory) }
+                    .testTag("postcard_category_badge_${post.id}"),
+                color = colors.champagne.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = when(postCategory) {
+                        "Design" -> "🎨 Design"
+                        "Vidéo" -> "🎬 Vidéo"
+                        else -> "✨ AI Art"
+                    },
+                    color = colors.champagne,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                 )
             }
 
@@ -1298,5 +1524,16 @@ private fun CrossPlatformInviteCard(
                 }
             }
         }
+    }
+}
+
+private fun getPostCategory(post: Post): String {
+    val text = (post.title ?: "") + " " + post.content + " " + post.mediaType
+    return when {
+        post.mediaType.equals("video", ignoreCase = true) -> "Vidéo"
+        text.contains("art", ignoreCase = true) || text.contains("ai", ignoreCase = true) || text.contains("généré", ignoreCase = true) -> "AI Art"
+        text.contains("design", ignoreCase = true) || text.contains("ui", ignoreCase = true) || text.contains("ux", ignoreCase = true) -> "Design"
+        post.mediaType.equals("image", ignoreCase = true) -> "AI Art"
+        else -> "Design"
     }
 }

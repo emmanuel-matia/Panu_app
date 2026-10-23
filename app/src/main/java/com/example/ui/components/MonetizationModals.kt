@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -714,9 +715,15 @@ fun CreatorFundPayoutDialog(
 
     var selectedProvider by remember { mutableStateOf(PaymentProvider.ORANGE_MONEY) }
     var accountNumber by remember { mutableStateOf("+225 07 00 00 00 00") }
+    val availableFcfa = stats?.totalAvailableFcfa ?: 95100.0
+    var withdrawAmountText by remember(availableFcfa) { mutableStateOf(availableFcfa.toInt().toString()) }
+    val requestedAmount = withdrawAmountText.toDoubleOrNull() ?: 0.0
+    val isAmountValid = requestedAmount in 500.0..availableFcfa && accountNumber.trim().length >= 8
+    val recentPayouts = featuresService?.payoutTransactions?.collectAsState()?.value ?: emptyList()
+    var isProcessing by remember { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isProcessing) onDismiss() },
         containerColor = colors.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -724,12 +731,12 @@ fun CreatorFundPayoutDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "💰 Fonds pour les Créateurs PANU",
+                        text = "💰 Retrait Fonds Créateurs PANU",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = colors.textPrimary
                     )
                     Text(
-                        text = "Partage des recettes publicitaires (Commission ${stats?.creatorFundCommissionPercent ?: 55}%)",
+                        text = "Passerelle bancaire & Mobile Money en temps réel (0% de frais)",
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.champagne
                     )
@@ -748,21 +755,21 @@ fun CreatorFundPayoutDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "Solde Disponible à Retirer en Argent Réel :",
+                            text = "Solde Disponible à Retirer :",
                             fontSize = 11.sp,
                             color = colors.textSecondary
                         )
                         Text(
-                            text = "${stats?.totalAvailableFcfa?.toInt() ?: 95100} FCFA",
+                            text = "${availableFcfa.toInt()} FCFA",
                             fontWeight = FontWeight.Black,
                             fontSize = 22.sp,
                             color = colors.champagne
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "• Vues cumulées : ${stats?.totalViews ?: 18450} vues (+${stats?.boostedViewsGained ?: 12500} vues boostées)\n" +
-                                    "• Commission Fonds Créateurs (55% Pubs AdMob/Shorts) : +${stats?.creatorFundShareFcfa?.toInt() ?: 28400} FCFA\n" +
-                                    "• Bonus Vues & Partages Viraux : +${stats?.viewsAndSharesBonusFcfa?.toInt() ?: 45200} FCFA",
+                            text = "• Vues rémunérées : ${stats?.totalViews ?: 18450} vues\n" +
+                                    "• Partage publicitaire (55% net) : +${stats?.creatorFundShareFcfa?.toInt() ?: 28400} FCFA\n" +
+                                    "• Cadeaux Live reçus : +${stats?.giftsReceivedCredits ?: 120} Crédits",
                             fontSize = 11.sp,
                             color = colors.textPrimary
                         )
@@ -770,7 +777,31 @@ fun CreatorFundPayoutDialog(
                 }
 
                 Text(
-                    text = "Choisissez votre compte de réception :",
+                    text = "Montant à transférer (FCFA) :",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = colors.textPrimary
+                )
+
+                OutlinedTextField(
+                    value = withdrawAmountText,
+                    onValueChange = { withdrawAmountText = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Montant (Min. 500 FCFA)") },
+                    singleLine = true,
+                    isError = requestedAmount > availableFcfa || (requestedAmount > 0 && requestedAmount < 500),
+                    supportingText = {
+                        if (requestedAmount > availableFcfa) {
+                            Text("Le montant dépasse votre solde disponible.", color = MaterialTheme.colorScheme.error)
+                        } else if (requestedAmount in 1.0..499.0) {
+                            Text("Minimum 500 FCFA", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Text(
+                    text = "Mode de versement :",
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     color = colors.textPrimary
@@ -796,13 +827,19 @@ fun CreatorFundPayoutDialog(
                         ) {
                             Text(prov.badgeEmoji, fontSize = 16.sp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = prov.labelFr,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = colors.textPrimary,
-                                modifier = Modifier.weight(1f)
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = prov.labelFr,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = prov.feeNote,
+                                    fontSize = 10.sp,
+                                    color = colors.textSecondary
+                                )
+                            }
                             if (isSelected) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(16.dp))
                             }
@@ -814,44 +851,88 @@ fun CreatorFundPayoutDialog(
                     value = accountNumber,
                     onValueChange = { accountNumber = it },
                     label = { Text("Numéro ${selectedProvider.labelFr} ou IBAN/Carte") },
+                    placeholder = { Text(if (selectedProvider == PaymentProvider.BANK_CARD) "Numéro de carte ou IBAN" else "+225 / +243 / +221 ...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp)
                 )
+
+                if (recentPayouts.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Derniers virements effectués :",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = colors.champagne
+                    )
+                    recentPayouts.take(3).forEach { tx ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = colors.surfaceElevated,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(tx.reference, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = colors.textPrimary)
+                                    Text("${tx.amountFcfa.toInt()} FCFA vers ${tx.provider.labelFr}", fontSize = 10.sp, color = colors.textSecondary)
+                                }
+                                Text(tx.status, color = Color(0xFF2ED573), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val amount = stats?.totalAvailableFcfa ?: 0.0
-                    if (amount <= 0) {
-                        Toast.makeText(context, "Aucun solde disponible à retirer.", Toast.LENGTH_SHORT).show()
+                    if (!isAmountValid) {
+                        Toast.makeText(context, "Montant ou coordonnées invalides.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    isProcessing = true
                     scope.launch {
-                        featuresService?.withdrawCreatorEarningsToRealMoney(
-                            amountFcfa = amount,
+                        val res = featuresService?.withdrawCreatorEarningsToRealMoney(
+                            amountFcfa = requestedAmount,
                             provider = selectedProvider,
                             accountIdentifier = accountNumber
                         )
-                        Toast.makeText(
-                            context,
-                            "💸 Virement de ${amount.toInt()} FCFA envoyé vers ${selectedProvider.labelFr} !",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        onDismiss()
+                        isProcessing = false
+                        if (res?.isSuccess == true) {
+                            Toast.makeText(
+                                context,
+                                "💸 Virement de ${requestedAmount.toInt()} FCFA validé avec succès !",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            onDismiss()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                res?.exceptionOrNull()?.localizedMessage ?: "Erreur de virement",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 },
+                enabled = isAmountValid && !isProcessing,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ED573)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("btn_withdraw_creator_fund")
             ) {
-                Text(
-                    text = "Retirer ${stats?.totalAvailableFcfa?.toInt() ?: 95100} FCFA vers ${selectedProvider.labelFr}",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Black
-                )
+                if (isProcessing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black)
+                } else {
+                    Text(
+                        text = "Valider le virement de ${requestedAmount.toInt()} FCFA",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
         },
         dismissButton = {

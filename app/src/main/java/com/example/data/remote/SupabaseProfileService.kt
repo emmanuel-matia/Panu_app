@@ -189,6 +189,50 @@ class SupabaseProfileService(private val client: SupabaseClient) {
         Result.success(Unit)
     }
 
+    suspend fun followUser(followerId: String, followingId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        if (followerId.isBlank() || followingId.isBlank() || followerId == followingId) return@withContext Result.success(Unit)
+        try {
+            val payload = JSONObject().apply {
+                put("follower_id", followerId)
+                put("following_id", followingId)
+            }
+            val headers = mapOf("Prefer" to "resolution=ignore-duplicates")
+            client.execute("/rest/v1/follows", method = "POST", jsonBody = payload.toString(), headers = headers)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unfollowUser(followerId: String, followingId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            client.execute("/rest/v1/follows?follower_id=eq.$followerId&following_id=eq.$followingId", method = "DELETE")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getFollowedIds(followerId: String): Result<Set<String>> = withContext(Dispatchers.IO) {
+        try {
+            val endpoint = "/rest/v1/follows?follower_id=eq.$followerId&select=following_id"
+            when (val resp = client.execute(endpoint)) {
+                is SupabaseResponse.Success -> {
+                    val arr = resp.asJsonArray() ?: JSONArray()
+                    val set = mutableSetOf<String>()
+                    for (i in 0 until arr.length()) {
+                        val id = arr.getJSONObject(i).optString("following_id")
+                        if (id.isNotBlank()) set.add(id)
+                    }
+                    Result.success(set)
+                }
+                else -> Result.success(emptySet())
+            }
+        } catch (_: Exception) {
+            Result.success(emptySet())
+        }
+    }
+
     suspend fun autoFollowFounder(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val founderQuery = "/rest/v1/profiles?email=eq.emmanuelmatia150@gmail.com&select=id"

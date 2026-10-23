@@ -795,7 +795,7 @@ private fun CanvasProjectCard(
                     ) {
                         Icon(Icons.Default.Public, contentDescription = null, tint = PanuObsidian, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(2.dp))
-                        Text("Publier", color = PanuObsidian, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        Text("Publier sur l'Accueil", color = PanuObsidian, fontSize = 11.sp, fontWeight = FontWeight.Black)
                     }
                 }
             }

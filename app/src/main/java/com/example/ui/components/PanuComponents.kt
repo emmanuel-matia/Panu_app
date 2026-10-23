@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DynamicFeed
@@ -46,6 +47,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.UserRole
+import com.example.data.remote.SupabasePanuFeaturesService
 import com.example.ui.navigation.PanuScreen
 import com.example.ui.theme.PanuEmerald
 import com.example.ui.theme.PanuTheme
@@ -76,9 +82,32 @@ fun PanuTopBar(
     onSearchClick: (() -> Unit)? = null,
     onMenuClick: (() -> Unit)? = null,
     canNavigateBack: Boolean = false,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    featuresService: SupabasePanuFeaturesService? = null,
+    onCreditsClick: (() -> Unit)? = null,
+    onCreateClick: (() -> Unit)? = null
 ) {
     val colors = PanuTheme.colors
+    val creditsBalance by (featuresService?.panuCreditsBalance ?: kotlinx.coroutines.flow.MutableStateFlow(60)).collectAsState()
+    val scope = rememberCoroutineScope()
+
+    // Fetch user credits upon mount and subscribe to Supabase Realtime channels for ai_credits
+    LaunchedEffect(featuresService) {
+        if (featuresService != null) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    featuresService.fetchAndListenUserCredits()
+                    featuresService.startRealtimeCreditsSubscription()
+                } catch (_: Exception) {}
+                while (true) {
+                    try {
+                        featuresService.fetchAndListenUserCredits()
+                    } catch (_: Exception) {}
+                    kotlinx.coroutines.delay(4000L)
+                }
+            }
+        }
+    }
 
     TopAppBar(
         title = {
@@ -122,6 +151,46 @@ fun PanuTopBar(
             }
         },
         actions = {
+            // CRREDITS BADGE (ai_credits table real-time display)
+            Surface(
+                color = colors.champagneSubtle,
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne),
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .clickable { onCreditsClick?.invoke() }
+                    .testTag("header_credits_badge")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🪙", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "$creditsBalance",
+                        color = colors.champagne,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp,
+                        modifier = Modifier.testTag("header_credit_balance")
+                    )
+                }
+            }
+
+            // CRÉER (+)
+            if (onCreateClick != null) {
+                IconButton(
+                    onClick = onCreateClick,
+                    modifier = Modifier.testTag("header_create_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Créer",
+                        tint = colors.champagne
+                    )
+                }
+            }
+
             // RECHERCHE
             if (onSearchClick != null) {
                 IconButton(onClick = onSearchClick) {

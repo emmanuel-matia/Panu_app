@@ -113,6 +113,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, [currentUserId]);
 
+  const dismissToast = useCallback(() => {
+    setActiveToast(null);
+    setGenericToast(null);
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setGenericToast({ message, type });
+  }, []);
+
   // Auto-fermeture des toasts après 4 secondes
   useEffect(() => {
     if (activeToast || genericToast) {
@@ -122,15 +131,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return () => clearTimeout(timer);
     }
   }, [activeToast, genericToast, dismissToast]);
-
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setGenericToast({ message, type });
-  }, []);
-
-  const dismissToast = useCallback(() => {
-    setActiveToast(null);
-    setGenericToast(null);
-  }, []);
 
   const markAsRead = useCallback(async (id: string) => {
     setNotifications((prev) =>

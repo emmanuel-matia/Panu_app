@@ -590,6 +590,19 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '' }) => {
     }
   };
 
+  if (loading && posts.length === 0) {
+    return (
+      <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0B0C12' }}>
+        <div style={{ width: 56, height: 56, background: '#E5A93C', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 0 30px rgba(229,169,60,0.25)', animation: 'panu-pulse 1.5s ease-in-out infinite' }}>
+          <span style={{ color: '#000', fontWeight: 900, fontSize: 28 }}>P</span>
+        </div>
+        <div style={{ color: '#E5A93C', fontWeight: 900, fontSize: 20, letterSpacing: 2, marginBottom: 6 }}>PANU</div>
+        <div style={{ color: '#6B7280', fontSize: 12 }}>Chargement du fil d'actualite...</div>
+        <style>{`@keyframes panu-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(0.92); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={{ color: '#F8F9FA' }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '12px 16px' }}>

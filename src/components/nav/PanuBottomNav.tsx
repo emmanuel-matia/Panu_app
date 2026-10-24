@@ -42,20 +42,10 @@ export const PanuBottomNav: React.FC<PanuBottomNavProps> = ({ onOpenCreate }) =>
           <span className="text-[10px]">Studio</span>
         </button>
 
-        {/* 3. BOUTON JAUNE + CENTRAL */}
-        <button
-          onClick={() => {
-            if (onOpenCreate) {
-              onOpenCreate();
-            } else {
-              navigate('/studio');
-            }
-          }}
-          aria-label="Créer ou publier"
-          className="relative -top-4 w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-black flex items-center justify-center font-black shadow-lg shadow-amber-500/30 hover:scale-105 active:scale-95 transition-all border-2 border-black"
-        >
-          <Plus className="w-7 h-7 stroke-[3]" />
-        </button>
+
+        {/* 3. VIDE (REMPLACE LE BOUTON +) */}
+        <div className="w-12"></div>
+
 
         {/* 4. DIRECTS */}
         <button

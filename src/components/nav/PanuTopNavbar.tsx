@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, FOUNDER_EMAIL } from '../../lib/supabaseClient';
 import { CinetPayRechargeModal } from '../payment/CinetPayRechargeModal';
-import { Search, Menu, Bell } from 'lucide-react';
+import { Search, Menu, Bell, Plus } from 'lucide-react';
 
 interface PanuTopNavbarProps {
   onOpenTemplates?: () => void;
@@ -179,6 +179,13 @@ export const PanuTopNavbar: React.FC<PanuTopNavbarProps> = ({
 
         {/* CÔTÉ DROIT : RECHERCHE, NOTIFICATIONS ET MENU */}
         <div className="flex items-center gap-3 text-gray-700">
+          <button 
+            onClick={() => navigate('/studio')}
+            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors" 
+            aria-label="Créer"
+          >
+            <Plus className="w-6 h-6"/>
+          </button>
           <button 
             onClick={() => setShowSearchModal(true)}
             className="p-1.5 hover:bg-gray-100 rounded-full transition-colors" 

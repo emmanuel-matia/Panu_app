@@ -101,7 +101,6 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
   // Onglet actif : [🔥 Pour vous] [✨ Tendances] (Interface épurée style TikTok)
   const [activeTab, setActiveTab] = useState<'for_you' | 'trending'>('for_you');
   const [sortBy, setSortBy] = useState<'recent' | 'likes' | 'comments'>('recent');
-  const [showMyPubFilter, setShowMyPubFilter] = useState(false);
 
   // Modales interactives
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
@@ -163,7 +162,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
       setIsCameraActive(true);
     } catch (err) {
       console.error('Erreur caméra :', err);
-      alert("Impossible d'accéder à la caméra.");
+      alert('Impossible d’accéder à la caméra.');
     }
   };
 
@@ -475,7 +474,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
     }
     const success = await toggleFollow(currentUserId, authorId);
     if (!success) {
-      alert("Erreur lors de la mise à jour de l'abonnement.");
+      alert('Erreur lors de la mise à jour de l’abonnement.');
     }
   };
 
@@ -493,7 +492,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
       postId,
       authorName: currentUserName || 'Vous',
       text,
-      createdAt: "À l'instant",
+      createdAt: 'À l’instant',
     };
     setCommentsMap((prev) => ({
       ...prev,
@@ -534,13 +533,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
       const { data: userData } = await supabase.auth.getUser();
       const authorId = userData?.user?.id || '00000000-0000-0000-0000-000000000001';
       let finalMediaUrl = newFeedUrl.trim();
-      let mediaType = 'text';
-
-      if (!finalMediaUrl && !selectedUploadFile) {
-        mediaType = 'text';
-      } else if (finalMediaUrl && !selectedUploadFile) {
-        mediaType = finalMediaUrl.endsWith('.mp4') || finalMediaUrl.endsWith('.webm') ? 'video' : 'image';
-      }
+      let mediaType = finalMediaUrl.endsWith('.mp4') ? 'video' : 'image';
 
       // Téléversement direct dans le stockage sécurisé
       if (selectedUploadFile) {
@@ -603,343 +596,1042 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
 
   if (loading && posts.length === 0) {
     return (
-      <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0B0C12' }}>
-        <div style={{ width: 48, height: 48, background: '#E5A93C', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 0 24px rgba(229,169,60,0.2)', animation: 'panu-pulse 1.5s ease-in-out infinite' }}>
-          <span style={{ color: '#000', fontWeight: 900, fontSize: 24 }}>P</span>
+      <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0B0C12' }}>
+        <div style={{ width: 56, height: 56, background: '#E5A93C', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 0 30px rgba(229,169,60,0.25)', animation: 'panu-pulse 1.5s ease-in-out infinite' }}>
+          <span style={{ color: '#000', fontWeight: 900, fontSize: 28 }}>P</span>
         </div>
-        <div style={{ color: '#E5A93C', fontWeight: 900, fontSize: 16, letterSpacing: 2 }}>PANU</div>
+        <div style={{ color: '#E5A93C', fontWeight: 900, fontSize: 20, letterSpacing: 2, marginBottom: 6 }}>PANU</div>
+        <div style={{ color: '#6B7280', fontSize: 12 }}>Chargement du fil d'actualite...</div>
         <style>{`@keyframes panu-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(0.92); } }`}</style>
       </div>
     );
   }
 
-  const liveCount = Object.values(activeLiveHosts).filter(Boolean).length;
-
   return (
     <div style={{ color: '#F8F9FA' }}>
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '8px 12px' }}>
-        {/* BANNIÈRE COMPACTE */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8, padding: '8px 12px', background: 'linear-gradient(135deg, #181926 0%, #1F1B2C 100%)', borderRadius: 12, border: '1px solid rgba(229,169,60,0.25)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span style={{ fontSize: 16 }}>🚀</span>
-            <strong style={{ color: '#FFF', fontSize: 12 }}>PANU Studio</strong>
-          </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button onClick={() => setShowTemplatesModal(true)} style={{ background: 'rgba(229,169,60,0.15)', border: '1px solid rgba(229,169,60,0.4)', color: '#E5A93C', borderRadius: 6, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              🎬 Templates
-            </button>
-            {liveCount > 0 && (
-              <a href="/live" style={{ background: 'rgba(255,46,76,0.15)', border: '1px solid #FF2E4C', color: '#FF2E4C', borderRadius: 6, padding: '4px 8px', fontSize: 10, fontWeight: 800, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FF2E4C', display: 'inline-block' }} /> {liveCount} Live{liveCount > 1 ? 's' : ''}
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* STORIES COMPACTES */}
-        <StoriesCarousel />
-
-        {/* CRÉER UNE PUBLICATION -- BOUTON COMPACT */}
-        <button
-          onClick={() => setShowPublishBox(true)}
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '12px 16px' }}>
+        {/* 2. MESSAGE D'ACCUEIL DYNAMIQUE & TENDANCE VIRALE (ENGAGEMENT & RÉTENTION) */}
+        <div
           style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            backgroundColor: '#15161E', border: '1px solid rgba(229,169,60,0.3)',
-            borderRadius: 12, padding: '10px 14px', marginBottom: 10, cursor: 'pointer',
-            color: '#888', fontSize: 13, fontWeight: 600,
+            background: 'linear-gradient(135deg, #181926 0%, #1F1B2C 100%)',
+            border: '1px solid rgba(229, 169, 60, 0.4)',
+            borderRadius: 16,
+            padding: '12px 18px',
+            marginBottom: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 12px rgba(229, 169, 60, 0.15)',
           }}
         >
-          <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(229,169,60,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>+</span>
-          Créer une publication...
-        </button>
-
-        {/* RECHERCHE COMPACTE */}
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13 }}>🔍</span>
-          <input
-            type="text" value={localSearch} onChange={(e) => setLocalSearch(e.target.value)}
-            placeholder="Rechercher..."
-            style={{ width: '100%', backgroundColor: '#15161F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '8px 12px 8px 32px', color: '#FFF', fontSize: 12, outline: 'none' }}
-          />
-          {localSearch && <button type="button" onClick={() => setLocalSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#AAA', cursor: 'pointer', fontSize: 14 }}>✕</button>}
-        </div>
-
-        {/* ONGLETS + TRI COMPACT */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {([['for_you', '🔥 Pour vous'], ['trending', '✨ Tendances']] as const).map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setActiveTab(key)}
-                style={{
-                  backgroundColor: activeTab === key ? '#E5A93C' : 'transparent',
-                  color: activeTab === key ? '#000' : '#AAA',
-                  border: activeTab === key ? 'none' : '1px solid rgba(255,255,255,0.12)',
-                  padding: '5px 12px', borderRadius: 999, fontWeight: 800, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
-                }}>
-                {label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                backgroundColor: 'rgba(229, 169, 60, 0.15)',
+                border: '1px solid #E5A93C',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+              }}
+            >
+              🚀
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <strong style={{ color: '#FFF', fontSize: 14 }}>
+                  Bienvenue sur PANU Studio • L’Afrique Créative en Plein Écran
+                </strong>
+                <span
+                  style={{
+                    backgroundColor: '#E5A93C',
+                    color: '#000',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    padding: '1px 6px',
+                    borderRadius: 999,
+                  }}
+                >
+                  NOUVEAU
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: 11, color: '#AAA' }}>
+                Reels dynamiques, diffusions en direct et modèles de montage IA CapCut / PixVerse en 1 clic.
+              </p>
+            </div>
           </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            style={{ backgroundColor: '#15161F', border: '1px solid rgba(255,255,255,0.12)', color: '#CCC', borderRadius: 8, padding: '5px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="recent">🕒 Récents</option>
-            <option value="likes">❤️ Likés</option>
-            <option value="comments">💬 Commentés</option>
-          </select>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setShowTemplatesModal(true)}
+              style={{
+                backgroundColor: '#E5A93C',
+                color: '#000',
+                border: 'none',
+                padding: '7px 14px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                boxShadow: '0 2px 10px rgba(229, 169, 60, 0.35)',
+              }}
+            >
+              <span>🎬</span>
+              <span>Tester un Template</span>
+            </button>
+            <a
+              href="/live"
+              style={{
+                backgroundColor: 'rgba(255, 46, 76, 0.2)',
+                border: '1px solid #FF2E4C',
+                color: '#FF2E4C',
+                textDecoration: 'none',
+                padding: '7px 12px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <span>🔴</span>
+              <span>Matchs en Live</span>
+            </a>
+          </div>
         </div>
 
-        {/* CATÉGORIES COMPACTES -- BARRE DÉFILANTE */}
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 8, scrollbarWidth: 'none' }}>
+        {/* 3. BARRE D'ONGLETS NETTOYÉE : [🔥 Pour vous] [📰 Fil Classique] [✨ Tendances] */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10,
+            marginBottom: 16,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            paddingBottom: 10,
+          }}
+        >
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('for_you')}
+              style={{
+                backgroundColor: activeTab === 'for_you' ? '#E5A93C' : 'transparent',
+                color: activeTab === 'for_you' ? '#000' : '#AAA',
+                border: activeTab === 'for_you' ? 'none' : '1px solid rgba(255,255,255,0.15)',
+                padding: '8px 16px',
+                borderRadius: 999,
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: 'pointer',
+                boxShadow: activeTab === 'for_you' ? '0 2px 10px rgba(229,169,60,0.3)' : 'none',
+              }}
+            >
+              🔥 Pour vous
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('trending')}
+              style={{
+                backgroundColor: activeTab === 'trending' ? '#E5A93C' : 'transparent',
+                color: activeTab === 'trending' ? '#000' : '#AAA',
+                border: activeTab === 'trending' ? 'none' : '1px solid rgba(255,255,255,0.15)',
+                padding: '8px 16px',
+                borderRadius: 999,
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              ✨ Tendances
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setShowSuggestModal(true)}
+              style={{
+                backgroundColor: '#1E202B',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#FFF',
+                padding: '6px 12px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              🌟 Suggérer
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReferralModal(true)}
+              style={{
+                backgroundColor: 'rgba(229, 169, 60, 0.15)',
+                border: '1px solid #E5A93C',
+                color: '#E5A93C',
+                padding: '6px 12px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              🎁 +50 crédits
+            </button>
+          </div>
+        </div>
+
+        {/* BARRE DE RECHERCHE TEXTUELLE EN TEMPS RÉEL (Auteur ou Mot-clé) */}
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 15 }}>🔍</span>
+          <input
+            type="text"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            placeholder="Rechercher par auteur ou mot-clé (ex: Musique, Jean...)"
+            style={{
+              width: '100%',
+              backgroundColor: '#15161F',
+              border: '1px solid rgba(229, 169, 60, 0.35)',
+              borderRadius: 12,
+              padding: '10px 14px 10px 38px',
+              color: '#FFF',
+              fontSize: 13,
+              outline: 'none',
+            }}
+          />
+          {localSearch && (
+            <button
+              type="button"
+              onClick={() => setLocalSearch('')}
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#AAA',
+                cursor: 'pointer',
+                fontSize: 16,
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* SÉLECTEUR DE DOMAINES DE CRÉATION (Musique, Arts Visuels, Cinéma, Littérature) */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, marginBottom: 12, scrollbarWidth: 'none' }}>
           {['Tous', 'Musique', 'Arts Visuels', 'Cinéma', 'Littérature'].map((domain) => {
             const isSelected = selectedDomainFilter === domain;
             return (
-              <button key={domain} type="button" onClick={() => setSelectedDomainFilter(domain)}
+              <button
+                key={domain}
+                type="button"
+                onClick={() => setSelectedDomainFilter(domain)}
                 style={{
-                  backgroundColor: isSelected ? '#E5A93C' : '#15161F', color: isSelected ? '#000' : '#999',
-                  border: isSelected ? '1px solid #E5A93C' : '1px solid rgba(255,255,255,0.08)',
-                  padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                  whiteSpace: 'nowrap', flexShrink: 0,
-                }}>
-                {domain}
+                  backgroundColor: isSelected ? '#E5A93C' : '#15161F',
+                  color: isSelected ? '#000' : '#CCC',
+                  border: isSelected ? '1px solid #E5A93C' : '1px solid rgba(255,255,255,0.12)',
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: isSelected ? 800 : 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span>{domain === 'Tous' ? '🌟' : domain === 'Musique' ? '🎵' : domain === 'Arts Visuels' ? '🎨' : domain === 'Cinéma' ? '🎬' : '📚'}</span>
+                <span>{domain}</span>
               </button>
             );
           })}
         </div>
 
-        {/* FIL DES PUBLICATIONS */}
-        {filteredPosts.length === 0 && !loading ? (
-          <div style={{ textAlign: 'center', padding: '32px 16px', color: '#888' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
-            <p style={{ fontSize: 13, margin: '0 0 12px' }}>Aucune publication pour le moment</p>
-            <button onClick={() => setShowPublishBox(true)}
-              style={{ backgroundColor: '#E5A93C', color: '#000', border: 'none', padding: '8px 20px', borderRadius: 10, fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
-              + Créer une publication
+        {/* BARRE DE FILTRAGE DYNAMIQUE (Plus récents, Plus likés, Plus commentés) */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+          {[
+            { key: 'recent', label: '🕒 Plus récents' },
+            { key: 'likes', label: '❤️ Plus likés' },
+            { key: 'comments', label: '💬 Plus commentés' },
+          ].map((sort) => (
+            <button
+              key={sort.key}
+              type="button"
+              onClick={() => setSortBy(sort.key as any)}
+              style={{
+                backgroundColor: sortBy === sort.key ? 'rgba(229, 169, 60, 0.2)' : '#15161F',
+                border: sortBy === sort.key ? '1px solid #E5A93C' : '1px solid rgba(255,255,255,0.1)',
+                color: sortBy === sort.key ? '#E5A93C' : '#AAA',
+                padding: '6px 12px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {sort.label}
             </button>
-          </div>
-        ) : (
-          <>
-            {/* LECTEUR REELS POUR LES ONGLETS FOR_YOU / TRENDING */}
-            {(activeTab === 'for_you' || activeTab === 'trending') && (
-              <div>
-                <PanuShortsFeedPlayer
-                  posts={filteredPosts}
-                  onOpenTemplates={() => setShowTemplatesModal(true)}
-                  onOpenLiveMatch={() => { window.location.href = '/live'; }}
-                  onOpenBoost={(post) => setShowBoostModalForPost(post)}
-                  onOpenComments={(postId) => setActiveCommentsPostId(postId)}
-                  onOpenAiChat={(post) => setActiveAiChatPost(post)}
-                  commentsMap={commentsMap}
-                  likedPosts={likedPosts}
-                  postLikesCount={postLikesCount}
-                  onToggleLike={handleToggleLike}
-                  followedCreators={followedCreators}
-                  creatorsFollowersCount={creatorsFollowersCount}
-                  onToggleFollow={handleToggleFollow}
-                  activeLiveHosts={activeLiveHosts}
-                />
-
-                {/* CRÉATEURS SUGGÉRÉS -- COMPACT */}
-                {suggestedCreators.length > 0 && (
-                  <div style={{ marginTop: 12, marginBottom: 12 }}>
-                    <h3 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 800, color: '#E5A93C' }}>Créateurs à suivre</h3>
-                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-                      {suggestedCreators.map(creator => (
-                        <div key={creator.id} style={{ flexShrink: 0, width: 100, backgroundColor: '#15161F', borderRadius: 12, padding: 8, border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-                          <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid #E5A93C', margin: '0 auto 6px', overflow: 'hidden', backgroundColor: '#0D0E12', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 16 }}>
-                            {creator.avatar_url ? <img src={creator.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (creator.username || 'P').charAt(0).toUpperCase()}
-                          </div>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{creator.full_name || creator.username}</div>
-                          <button onClick={() => handleToggleFollow(creator.id)}
-                            style={{ width: '100%', marginTop: 4, padding: '4px', borderRadius: 6, border: 'none', backgroundColor: followedCreators[creator.id] ? 'rgba(255,255,255,0.1)' : '#E5A93C', color: followedCreators[creator.id] ? '#FFF' : '#000', fontSize: 9, fontWeight: 800, cursor: 'pointer' }}>
-                            {followedCreators[creator.id] ? 'Abonné' : 'Suivre'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* BOUTONS DISCRETS -- PARRAINAGE & SUGGESTION */}
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8, marginBottom: 8 }}>
-          <button type="button" onClick={() => setShowReferralModal(true)} style={{ background: 'none', border: 'none', color: '#E5A93C', fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '4px 8px' }}>
-            🎁 Parrainage
-          </button>
-          <button type="button" onClick={() => setShowSuggestModal(true)} style={{ background: 'none', border: 'none', color: '#888', fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '4px 8px' }}>
-            🌟 Suggérer
-          </button>
+          ))}
         </div>
-      </div>
 
-      {/* MODALE DE PUBLICATION */}
-      {showPublishBox && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
-          onClick={() => { setShowPublishBox(false); stopPublishCamera(); }}>
-          <div style={{ backgroundColor: '#161722', borderTop: '2px solid #E5A93C', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxWidth: 520, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 16 }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, color: '#E5A93C', fontSize: 15, fontWeight: 900 }}>Nouvelle publication</h3>
-              <button type="button" onClick={() => { setShowPublishBox(false); stopPublishCamera(); }} style={{ background: 'none', border: 'none', color: '#FFF', fontSize: 18, cursor: 'pointer' }}>✕</button>
+        {/* ESPACE DE NOUVELLE PUBLICATION (INTERFACE ÉPURÉE & CAMÉRA RÉELLE) */}
+        <div
+          style={{
+            backgroundColor: '#15161E',
+            border: '1px solid rgba(229, 169, 60, 0.45)',
+            borderRadius: 20,
+            padding: 20,
+            marginBottom: 20,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 24 }}>🎬</span>
+              <h3 style={{ margin: 0, color: '#E5A93C', fontSize: 16, fontWeight: 900 }}>
+                Nouvelle publication
+              </h3>
             </div>
-
-            {isCameraActive && (
-              <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', backgroundColor: '#000', borderRadius: 12, overflow: 'hidden', marginBottom: 12, border: '2px solid #E5A93C' }}>
-                <video ref={publishVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 6 }}>
-                  <button onClick={toggleCameraFacing} style={{ backgroundColor: 'rgba(0,0,0,0.6)', border: '1px solid #FFF', color: '#FFF', borderRadius: 999, width: 32, height: 32, cursor: 'pointer', fontSize: 14 }}>🔄</button>
-                </div>
-                <span style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'red', color: '#FFF', fontSize: 9, fontWeight: 900, padding: '2px 6px', borderRadius: 4, animation: 'pulse 1.5s infinite' }}>REC</span>
-              </div>
+            {!isCameraActive ? (
+              <button
+                onClick={startPublishCamera}
+                style={{
+                  backgroundColor: 'rgba(46, 213, 115, 0.15)',
+                  border: '1px solid #2ED573',
+                  color: '#2ED573',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Activer Caméra
+              </button>
+            ) : (
+              <button
+                onClick={stopPublishCamera}
+                style={{
+                  backgroundColor: 'rgba(255, 71, 87, 0.15)',
+                  border: '1px solid #FF4757',
+                  color: '#FF4757',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                Couper Caméra
+              </button>
             )}
+          </div>
 
-            <form onSubmit={handlePublishFeed} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input type="text" value={newFeedTitle} onChange={(e) => setNewFeedTitle(e.target.value)} placeholder="Que voulez-vous partager ?"
-                style={{ backgroundColor: '#0D0E12', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 14px', color: '#FFF', fontSize: 13, outline: 'none' }} />
+          {/* APERÇU CAMÉRA EN DIRECT (WebRTC) */}
+          {isCameraActive && (
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '4/3',
+                backgroundColor: '#000',
+                borderRadius: 14,
+                overflow: 'hidden',
+                marginBottom: 16,
+                border: '2px solid #E5A93C',
+              }}
+            >
+              <video
+                ref={publishVideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 8 }}>
+                <button
+                  onClick={toggleCameraFacing}
+                  style={{
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    border: '1px solid #FFF',
+                    color: '#FFF',
+                    borderRadius: 999,
+                    width: 36,
+                    height: 36,
+                    cursor: 'pointer',
+                  }}
+                  title="Changer de caméra"
+                >
+                  🔄
+                </button>
+              </div>
+              <div style={{ position: 'absolute', top: 10, left: 10 }}>
+                <span style={{ backgroundColor: 'red', color: '#FFF', fontSize: 10, fontWeight: 900, padding: '2px 8px', borderRadius: 4, animation: 'pulse 1.5s infinite' }}>
+                  REC
+                </span>
+              </div>
+            </div>
+          )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <label style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '7px 12px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: '#FFF', fontWeight: 700 }}>
-                  🖼️ Galerie
-                  <input type="file" accept="video/*,image/*" onChange={(e) => { if (e.target.files?.[0]) setSelectedUploadFile(e.target.files[0]); }} style={{ display: 'none' }} />
+          <form onSubmit={handlePublishFeed} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input
+              type="text"
+              value={newFeedTitle}
+              onChange={(e) => setNewFeedTitle(e.target.value)}
+              placeholder="Titre / Légende de votre création..."
+              required
+              style={{
+                backgroundColor: '#0D0E12',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 10,
+                padding: '12px 16px',
+                color: '#FFF',
+                fontSize: 14,
+                outline: 'none',
+              }}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: 10,
+                    padding: '8px 16px',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: '#FFF',
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>🖼️ Galerie</span>
+                  <input
+                    type="file"
+                    accept="video/*,image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setSelectedUploadFile(e.target.files[0]);
+                      }
+                    }}
+                    style={{ display: 'none' }}
+                  />
                 </label>
-                {!isCameraActive ? (
-                  <button type="button" onClick={() => startPublishCamera()} style={{ backgroundColor: 'rgba(46,213,115,0.15)', border: '1px solid #2ED573', color: '#2ED573', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>📷 Caméra</button>
-                ) : (
-                  <button type="button" onClick={stopPublishCamera} style={{ backgroundColor: 'rgba(255,71,87,0.15)', border: '1px solid #FF4757', color: '#FF4757', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>⏹ Stop</button>
-                )}
                 {selectedUploadFile && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, backgroundColor: 'rgba(229,169,60,0.1)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(229,169,60,0.3)' }}>
-                    <span style={{ fontSize: 10, color: '#E5A93C', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUploadFile.name}</span>
-                    <button type="button" onClick={() => setSelectedUploadFile(null)} style={{ background: 'transparent', border: 'none', color: '#FF4757', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'rgba(229, 169, 60, 0.1)', padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(229, 169, 60, 0.3)' }}>
+                    <span style={{ fontSize: 11, color: '#E5A93C', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedUploadFile.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUploadFile(null)}
+                      style={{ backgroundColor: 'transparent', border: 'none', color: '#FF4757', cursor: 'pointer', fontSize: 14 }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
               </div>
 
-              <button type="submit" disabled={isPublishingNewPost}
-                style={{ backgroundColor: '#E5A93C', color: '#000', border: 'none', borderRadius: 10, padding: '10px 20px', fontWeight: 900, cursor: isPublishingNewPost ? 'not-allowed' : 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <button
+                type="submit"
+                disabled={isPublishingNewPost}
+                style={{
+                  backgroundColor: '#E5A93C',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: 10,
+                  padding: '10px 24px',
+                  fontWeight: 900,
+                  cursor: isPublishingNewPost ? 'not-allowed' : 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 20px rgba(229, 169, 60, 0.3)',
+                }}
+              >
                 {isPublishingNewPost ? '⏳ Publication...' : '🚀 Publier'}
               </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE COMMENTAIRES */}
-      {activeCommentsPostId && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}
-          onClick={() => setActiveCommentsPostId(null)}>
-          <div style={{ backgroundColor: '#161722', borderTop: '2px solid #E5A93C', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxWidth: 520, width: '100%', maxHeight: '60vh', display: 'flex', flexDirection: 'column', padding: 16 }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 14, color: '#E5A93C' }}>💬 Commentaires ({(commentsMap[activeCommentsPostId] || []).length})</h3>
-              <button type="button" onClick={() => setActiveCommentsPostId(null)} style={{ background: 'transparent', border: 'none', color: '#FFF', fontSize: 16, cursor: 'pointer' }}>✕</button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: 6, marginBottom: 10 }}>
-              {(commentsMap[activeCommentsPostId] || []).length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#777', fontSize: 12, margin: '16px 0' }}>Aucun commentaire. Soyez le premier !</p>
-              ) : (commentsMap[activeCommentsPostId] || []).map((c) => (
-                <div key={c.id} style={{ backgroundColor: '#0D0E12', padding: '7px 10px', borderRadius: 8, fontSize: 12 }}>
-                  <span style={{ color: '#E5A93C', fontWeight: 800 }}>{c.authorName}: </span>
-                  <span style={{ color: '#EEE' }}>{c.text}</span>
+          </form>
+        </div>
+
+
+        {/* ============================================================================== */}
+        {/* 4. LECTEUR VIDÉO DYNAMIQUE VERTICAL (STYLE REELS / SHORTS / CAPCUT)           */}
+        {/* ============================================================================== */}
+        {activeTab === 'for_you' || activeTab === 'trending' ? (
+          <div>
+            <StoriesCarousel />
+            <LiveFeed />
+            <PanuShortsFeedPlayer
+              posts={filteredPosts}
+              onOpenTemplates={() => setShowTemplatesModal(true)}
+              onOpenLiveMatch={() => {
+                window.location.href = '/live';
+              }}
+              onOpenBoost={(post) => setShowBoostModalForPost(post)}
+              onOpenComments={(postId) => setActiveCommentsPostId(postId)}
+              onOpenAiChat={(post) => setActiveAiChatPost(post)}
+              commentsMap={commentsMap}
+              likedPosts={likedPosts}
+              postLikesCount={postLikesCount}
+              onToggleLike={handleToggleLike}
+              followedCreators={followedCreators}
+              creatorsFollowersCount={creatorsFollowersCount}
+              onToggleFollow={handleToggleFollow}
+              activeLiveHosts={activeLiveHosts}
+            />
+
+            {/* SUGGESTIONS DE CRÉATEURS RÉELS */}
+            {suggestedCreators.length > 0 && (
+              <div style={{ marginTop: 24, marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#E5A93C' }}>🌟 Créateurs à suivre</h3>
+                  <span style={{ fontSize: 11, color: '#AAA' }}>Basé sur l'activité réelle</span>
                 </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input type="text" value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Commenter..."
-                style={{ flex: 1, backgroundColor: '#0D0E12', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '8px 10px', color: '#FFF', fontSize: 12 }}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddComment(activeCommentsPostId)} />
-              <button type="button" onClick={() => handleAddComment(activeCommentsPostId)} style={{ backgroundColor: '#E5A93C', color: '#000', border: 'none', padding: '8px 14px', borderRadius: 8, fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>Envoyer</button>
+                <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+                  {suggestedCreators.map(creator => (
+                    <div 
+                      key={creator.id} 
+                      style={{ 
+                        flexShrink: 0, 
+                        width: 130, 
+                        backgroundColor: '#15161F', 
+                        borderRadius: 16, 
+                        padding: 12, 
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div style={{ width: 54, height: 54, borderRadius: '50%', border: '2px solid #E5A93C', margin: '0 auto 8px', overflow: 'hidden', backgroundColor: '#0D0E12', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
+                        {creator.avatar_url ? <img src={creator.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (creator.username || 'P').charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {creator.full_name || creator.username}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#AAA', marginBottom: 8, height: 14, overflow: 'hidden' }}>@{creator.username}</div>
+                      <button 
+                        onClick={() => handleToggleFollow(creator.id)}
+                        style={{ 
+                          width: '100%', 
+                          padding: '6px', 
+                          borderRadius: 8, 
+                          border: 'none', 
+                          backgroundColor: followedCreators[creator.id] ? 'rgba(255,255,255,0.1)' : '#E5A93C', 
+                          color: followedCreators[creator.id] ? '#FFF' : '#000',
+                          fontSize: 10,
+                          fontWeight: 900,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {followedCreators[creator.id] ? 'Abonné' : 'Suivre'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Conseils d'engagement sous le lecteur */}
+            <div
+              style={{
+                marginTop: 12,
+                textAlign: 'center',
+                fontSize: 12,
+                color: '#888',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 16,
+              }}
+            >
+              <span>👆 Glisse vers le haut pour la vidéo suivante</span>
+              <span>❤️ Double-clic pour liker</span>
+              <span>🔊 Clic sur l’icône pour le son</span>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* MODALE TEMPLATES */}
-      {showTemplatesModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 12 }}>
-          <div style={{ backgroundColor: '#161722', border: '1px solid #E5A93C', borderRadius: 16, maxWidth: 900, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h2 style={{ margin: 0, color: '#E5A93C', fontSize: 16 }}>🎬 Templates PANU</h2>
-              <button type="button" onClick={() => setShowTemplatesModal(false)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '4px 10px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>✕ Fermer</button>
-            </div>
-            <DynamicTemplateGallery onTemplateSelect={() => setShowTemplatesModal(false)} />
-          </div>
-        </div>
-      )}
-
-      {/* MODALE FONDATEUR */}
-      {showFounderFinanceModal && isFounder && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ backgroundColor: '#161722', border: '2px solid #2ED573', borderRadius: 16, maxWidth: 500, width: '100%', padding: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ margin: 0, color: '#2ED573', fontSize: 16 }}>📊 Gains Globaux (Fondateur)</h2>
-              <button type="button" onClick={() => setShowFounderFinanceModal(false)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '4px 10px', borderRadius: 8, cursor: 'pointer' }}>✕</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 14 }}>
-              <div style={{ backgroundColor: '#0D0E12', padding: 12, borderRadius: 10, border: '1px solid rgba(46,213,115,0.3)' }}>
-                <div style={{ fontSize: 10, color: '#888' }}>Revenus</div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: '#2ED573' }}>{founderFinancials.totalRevenueFcfa.toLocaleString()} FC</div>
+        ) : (
+          /* FIL CLASSIQUE AVEC CARTES */
+          <div style={{ display: 'grid', gap: 20 }}>
+            {filteredPosts.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: '#15161F',
+                  borderRadius: 16,
+                  border: '1px solid rgba(229, 169, 60, 0.25)',
+                  padding: '40px 24px',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 40, marginBottom: 8 }}>🎥</div>
+                <h3 style={{ color: '#E5A93C', margin: '0 0 6px', fontSize: 16 }}>
+                  Fil Classique Prêt pour les Publications
+                </h3>
+                <p style={{ color: '#AAA', fontSize: 12, margin: '0 0 16px' }}>
+                  Aucun contenu factice. Basculez sur l’onglet "🔥 Pour vous" pour profiter du lecteur vidéo dynamique.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('for_you')}
+                  style={{
+                    backgroundColor: '#E5A93C',
+                    color: '#000',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    fontWeight: 800,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Voir le Lecteur Plein Écran
+                </button>
               </div>
-              <div style={{ backgroundColor: '#0D0E12', padding: 12, borderRadius: 10, border: '1px solid rgba(229,169,60,0.3)' }}>
-                <div style={{ fontSize: 10, color: '#888' }}>Commissions 20%</div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: '#E5A93C' }}>{founderFinancials.commissionsFcfa.toLocaleString()} FC</div>
-              </div>
-              <div style={{ backgroundColor: '#0D0E12', padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)' }}>
-                <div style={{ fontSize: 10, color: '#888' }}>Transactions</div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: '#FFF' }}>{founderFinancials.totalWithdrawals}</div>
-              </div>
-            </div>
-            <div style={{ backgroundColor: '#0D0E12', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 11, color: '#BBB' }}>
-              🔒 Sécurité RLS : données financières strictement privées.
-            </div>
-          </div>
-        </div>
-      )}
-
-      <CinetPayRechargeModal isOpen={showCinetPayModal} onClose={() => setShowCinetPayModal(false)} currentBalance={userCredits} onSuccess={(addedCoins) => setUserCredits((prev) => prev + addedCoins)} />
-
-      {/* MODALE BOOSTER */}
-      {showBoostModalForPost && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ backgroundColor: '#181922', border: '1px solid #2ED573', borderRadius: 16, maxWidth: 400, width: '100%', padding: 18 }}>
-            <h3 style={{ margin: '0 0 8px', color: '#2ED573', fontSize: 15 }}>⚡ Booster "{showBoostModalForPost.title}"</h3>
-            <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
-              {[
-                { name: 'Boost Découverte', views: '+5 000 vues', price: '2 500 FCFA' },
-                { name: 'Boost Viral Élite', views: '+25 000 vues', price: '10 000 FCFA' },
-              ].map((b) => (
-                <button key={b.name} type="button" onClick={() => handleBoostPost(showBoostModalForPost, b.name, b.views)}
-                  style={{ backgroundColor: '#0D0E12', border: '1px solid rgba(46,213,115,0.4)', padding: 10, borderRadius: 10, color: '#FFF', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: 800, fontSize: 12, color: '#2ED573' }}>{b.name}</div>
-                    <div style={{ fontSize: 10, color: '#AAA' }}>{b.views}</div>
+            ) : (
+              filteredPosts.map((post) => (
+                <div
+                  key={post.id}
+                  style={{
+                    backgroundColor: '#181922',
+                    borderRadius: 14,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {post.media_url && (
+                    <video
+                      src={post.media_url}
+                      controls
+                      playsInline
+                      style={{ width: '100%', maxHeight: 380, objectFit: 'cover' }}
+                    />
+                  )}
+                  <div style={{ padding: 14 }}>
+                    <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{post.title}</h3>
+                    <p style={{ margin: '0 0 10px', fontSize: 12, color: '#CCC' }}>{post.content}</p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLike(post.id)}
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: '#FFF',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ❤️ {postLikesCount[post.id] || 0}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveCommentsPostId(post.id)}
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: '#FFF',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        💬 Commentaires
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#E5A93C' }}>{b.price}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ============================================================================== */}
+      {/* 5. TIROIR / MODALE DES COMMENTAIRES                                           */}
+      {/* ============================================================================== */}
+      {activeCommentsPostId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setActiveCommentsPostId(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#161722',
+              borderTop: '2px solid #E5A93C',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              maxWidth: 520,
+              width: '100%',
+              maxHeight: '65vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 20,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: '#E5A93C' }}>
+                💬 Commentaires ({(commentsMap[activeCommentsPostId] || []).length})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveCommentsPostId(null)}
+                style={{ backgroundColor: 'transparent', border: 'none', color: '#FFF', fontSize: 18, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: 8, marginBottom: 14 }}>
+              {(commentsMap[activeCommentsPostId] || []).length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#777', fontSize: 13, margin: '20px 0' }}>
+                  Aucun commentaire. Sois le premier à réagir !
+                </p>
+              ) : (
+                (commentsMap[activeCommentsPostId] || []).map((c) => (
+                  <div key={c.id} style={{ backgroundColor: '#0D0E12', padding: '8px 12px', borderRadius: 8, fontSize: 12 }}>
+                    <span style={{ color: '#E5A93C', fontWeight: 800 }}>{c.authorName} : </span>
+                    <span style={{ color: '#EEE' }}>{c.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="Ajouter un commentaire..."
+                style={{
+                  flex: 1,
+                  backgroundColor: '#0D0E12',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 8,
+                  padding: '9px 12px',
+                  color: '#FFF',
+                  fontSize: 13,
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddComment(activeCommentsPostId)}
+              />
+              <button
+                type="button"
+                onClick={() => handleAddComment(activeCommentsPostId)}
+                style={{
+                  backgroundColor: '#E5A93C',
+                  color: '#000',
+                  border: 'none',
+                  padding: '9px 16px',
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Envoyer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* 6. MODALE UNIVERSELLE 'TEMPLATES'                                              */}
+      {/* ============================================================================== */}
+      {showTemplatesModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#161722',
+              border: '1px solid #E5A93C',
+              borderRadius: 16,
+              maxWidth: 900,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: 24,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ margin: 0, color: '#E5A93C', fontSize: 20 }}>🎬 Galerie des Templates PANU</h2>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#AAA' }}>
+                  Modèles CapCut / PixVerse : l’IA exécute automatiquement les consignes de style et de montage.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTemplatesModal(false)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#FFF',
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+              >
+                ✕ Fermer
+              </button>
+            </div>
+
+            <DynamicTemplateGallery
+              onTemplateSelect={() => {
+                setShowTemplatesModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================== */}
+      {/* 7. MODALE DES GAINS GLOBAUX — STRICTEMENT RÉSERVÉE AU FONDATEUR                */}
+      {/* ============================================================================== */}
+      {showFounderFinanceModal && isFounder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#161722',
+              border: '2px solid #2ED573',
+              borderRadius: 16,
+              maxWidth: 600,
+              width: '100%',
+              padding: 24,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ margin: 0, color: '#2ED573', fontSize: 18 }}>
+                  📊 Tableau de Bord des Gains Globaux (Fondateur Uniquement)
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: '#AAA' }}>
+                  Compte officiel : <strong>{FOUNDER_EMAIL}</strong> • Sécurité RLS et isolation financière active
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFounderFinanceModal(false)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#FFF',
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 18 }}>
+              <div style={{ backgroundColor: '#0D0E12', padding: 14, borderRadius: 10, border: '1px solid rgba(46, 213, 115, 0.3)' }}>
+                <div style={{ fontSize: 11, color: '#888' }}>Total Revenus Plateforme</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#2ED573', marginTop: 4 }}>
+                  {founderFinancials.totalRevenueFcfa.toLocaleString()} FC
+                </div>
+                <div style={{ fontSize: 11, color: '#AAA' }}>
+                  ≈ {Math.round(founderFinancials.totalRevenueFcfa / 2850)} $ USD
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#0D0E12', padding: 14, borderRadius: 10, border: '1px solid rgba(229, 169, 60, 0.3)' }}>
+                <div style={{ fontSize: 11, color: '#888' }}>Commissions 20% Prévues</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#E5A93C', marginTop: 4 }}>
+                  {founderFinancials.commissionsFcfa.toLocaleString()} FC
+                </div>
+                <div style={{ fontSize: 11, color: '#AAA' }}>
+                  ≈ {Math.round(founderFinancials.commissionsFcfa / 2850)} $ USD
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#0D0E12', padding: 14, borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+                <div style={{ fontSize: 11, color: '#888' }}>Transactions Enregistrées</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#FFF', marginTop: 4 }}>
+                  {founderFinancials.totalWithdrawals} Opération{founderFinancials.totalWithdrawals > 1 ? 's' : ''}
+                </div>
+                <div style={{ fontSize: 11, color: '#2ED573' }}>En temps réel via Supabase</div>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#0D0E12', padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, color: '#BBB' }}>
+              🔒 <strong>Sécurité RLS Garantie :</strong> Les données financières restent strictement privées et invisibles sur le flux d'accueil public.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE RECHARGEMENT CINETPAY */}
+      <CinetPayRechargeModal
+        isOpen={showCinetPayModal}
+        onClose={() => setShowCinetPayModal(false)}
+        currentBalance={userCredits}
+        onSuccess={(addedCoins) => setUserCredits((prev) => prev + addedCoins)}
+      />
+
+      {/* ============================================================================== */}
+      {/* 9. MODALE DU BOOSTER ⚡                                                        */}
+      {/* ============================================================================== */}
+      {showBoostModalForPost && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div style={{ backgroundColor: '#181922', border: '1px solid #2ED573', borderRadius: 16, maxWidth: 440, width: '100%', padding: 20 }}>
+            <h3 style={{ margin: '0 0 8px', color: '#2ED573' }}>⚡ Booster la Visibilité de la Vidéo</h3>
+            <p style={{ fontSize: 12, color: '#BBB', margin: '0 0 14px' }}>
+              Propulsez <strong>"{showBoostModalForPost.title}"</strong> dans les flux Tendances et Pour vous de milliers d'utilisateurs.
+            </p>
+
+            <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+              {[
+                { name: 'Boost Découverte', views: '+5 000 vues', price: '2 500 FCFA / 10 000 FC' },
+                { name: 'Boost Viral Élite', views: '+25 000 vues', price: '10 000 FCFA / 45 000 FC' },
+              ].map((b) => (
+                <button
+                  key={b.name}
+                  type="button"
+                  onClick={() => handleBoostPost(showBoostModalForPost, b.name, b.views)}
+                  style={{
+                    backgroundColor: '#0D0E12',
+                    border: '1px solid rgba(46, 213, 115, 0.4)',
+                    padding: 12,
+                    borderRadius: 10,
+                    color: '#FFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#2ED573' }}>{b.name}</div>
+                    <div style={{ fontSize: 11, color: '#AAA' }}>{b.views} garanties</div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#E5A93C' }}>{b.price}</div>
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setShowBoostModalForPost(null)} style={{ width: '100%', backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: 8, borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Annuler</button>
+
+            <button
+              type="button"
+              onClick={() => setShowBoostModalForPost(null)}
+              style={{
+                width: '100%',
+                backgroundColor: 'transparent',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#FFF',
+                padding: 10,
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>
           </div>
         </div>
       )}
 
-      {/* MODALE PARRAINAGE */}
+      {/* MODALES GROWTH HACKING (PARRAINAGE & SUGGESTION) */}
       {showReferralModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ backgroundColor: '#181922', border: '1px solid #E5A93C', borderRadius: 16, maxWidth: 380, width: '100%', padding: 18 }}>
-            <h3 style={{ margin: '0 0 8px', color: '#E5A93C', fontSize: 15 }}>🎁 Parrainage (+50 Crédits)</h3>
-            <div style={{ backgroundColor: '#0D0E12', padding: 10, borderRadius: 8, fontSize: 16, fontWeight: 900, color: '#E5A93C', textAlign: 'center', marginBottom: 10 }}>{referralCode}</div>
-            <button type="button" onClick={() => { navigator.clipboard.writeText(referralLink); alert(`Lien copié : ${referralLink}`); }} style={{ width: '100%', backgroundColor: '#E5A93C', color: '#000', border: 'none', padding: 9, borderRadius: 8, fontWeight: 800, cursor: 'pointer', marginBottom: 6, fontSize: 12 }}>Copier le lien</button>
-            <button type="button" onClick={() => setShowReferralModal(false)} style={{ width: '100%', backgroundColor: 'transparent', border: '1px solid #444', color: '#FFF', padding: 7, borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Fermer</button>
+          <div style={{ backgroundColor: '#181922', border: '1px solid #E5A93C', borderRadius: 16, maxWidth: 440, width: '100%', padding: 20 }}>
+            <h3 style={{ margin: '0 0 8px', color: '#E5A93C' }}>🎁 Parrainage Créateur (+50 Crédits)</h3>
+            <p style={{ fontSize: 12, color: '#BBB' }}>Votre code de parrainage exclusif :</p>
+            <div style={{ backgroundColor: '#0D0E12', padding: 12, borderRadius: 8, fontSize: 18, fontWeight: 900, color: '#E5A93C', textAlign: 'center', marginBottom: 12 }}>
+              {referralCode}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(referralLink);
+                alert(`Lien copié : ${referralLink}`);
+              }}
+              style={{ width: '100%', backgroundColor: '#E5A93C', color: '#000', border: 'none', padding: 10, borderRadius: 8, fontWeight: 800, cursor: 'pointer', marginBottom: 8 }}
+            >
+              Copier le lien
+            </button>
+            <button type="button" onClick={() => setShowReferralModal(false)} style={{ width: '100%', backgroundColor: 'transparent', border: '1px solid #444', color: '#FFF', padding: 8, borderRadius: 8, cursor: 'pointer' }}>
+              Fermer
+            </button>
           </div>
         </div>
       )}
 
-      <PostAiChatModal post={activeAiChatPost} isOpen={!!activeAiChatPost} onClose={() => setActiveAiChatPost(null)} />
+      {/* MODALE DISCUTER AVEC L'IA */}
+      <PostAiChatModal
+        post={activeAiChatPost}
+        isOpen={!!activeAiChatPost}
+        onClose={() => setActiveAiChatPost(null)}
+      />
     </div>
   );
 };

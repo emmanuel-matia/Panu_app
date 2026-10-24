@@ -1,6 +1,11 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Video, Plus, Radio, User } from 'lucide-react';
+import {
+  Home as HomeIcon,
+  Sparkles as SparklesIcon,
+  Video as VideoIcon,
+  User as UserIcon
+} from 'lucide-react';
 
 export interface PanuBottomNavProps {
   onOpenCreate?: () => void;
@@ -8,67 +13,63 @@ export interface PanuBottomNavProps {
 
 /**
  * Composant `PanuBottomNav` :
- * - Barre de navigation inférieure fixe avec le bouton central jaune d'action rapide (+).
- * - Navigation fluide entre Accueil, Studio, Directs et Profil.
+ * Barre de navigation inférieure corrigée avec 4 onglets :
+ * - Accueil
+ * - Studio IA
+ * - Créations
+ * - Compte
  */
-export const PanuBottomNav: React.FC<PanuBottomNavProps> = ({ onOpenCreate }) => {
+export const PanuBottomNav: React.FC<PanuBottomNavProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isActive = (path: string) => location.pathname === path;
+  const isHomeActive = location.pathname === '/' || location.pathname === '/home';
+  const isStudioActive = location.pathname === '/studio' || location.pathname === '/studio-ia';
+  const isCreationsActive = location.pathname === '/creations' || location.pathname === '/vod';
+  const isAccountActive = location.pathname === '/profile' || location.pathname === '/compte' || location.pathname === '/account';
 
+  // Barre de navigation inférieure corrigée
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-gray-950/95 backdrop-blur-md border-t border-gray-800/80 z-50 px-4 py-2">
-      <div className="max-w-md mx-auto flex items-center justify-between">
-        {/* 1. ACCUEIL */}
-        <button
-          onClick={() => navigate('/')}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            isActive('/') || isActive('/home') ? 'text-amber-400 font-bold' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-[10px]">Accueil</span>
-        </button>
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg flex justify-around items-center py-2 z-50">
+      <button
+        onClick={() => navigate('/')}
+        className={`flex flex-col items-center transition-colors ${
+          isHomeActive ? 'text-amber-600 font-medium' : 'text-gray-400 hover:text-amber-600'
+        }`}
+      >
+        <HomeIcon className="w-6 h-6" />
+        <span className="text-xs mt-1">Accueil</span>
+      </button>
 
-        {/* 2. STUDIO */}
-        <button
-          onClick={() => navigate('/studio')}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            isActive('/studio') ? 'text-amber-400 font-bold' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Video className="w-5 h-5" />
-          <span className="text-[10px]">Studio</span>
-        </button>
+      <button
+        onClick={() => navigate('/studio')}
+        className={`flex flex-col items-center transition-colors ${
+          isStudioActive ? 'text-amber-600 font-medium' : 'text-gray-400 hover:text-amber-600'
+        }`}
+      >
+        <SparklesIcon className="w-6 h-6" />
+        <span className="text-xs mt-1">Studio IA</span>
+      </button>
 
+      <button
+        onClick={() => navigate('/creations')}
+        className={`flex flex-col items-center transition-colors ${
+          isCreationsActive ? 'text-amber-600 font-medium' : 'text-gray-400 hover:text-amber-600'
+        }`}
+      >
+        <VideoIcon className="w-6 h-6" />
+        <span className="text-xs mt-1">Créations</span>
+      </button>
 
-        {/* 3. VIDE (REMPLACE LE BOUTON +) */}
-        <div className="w-12"></div>
-
-
-        {/* 4. DIRECTS */}
-        <button
-          onClick={() => navigate('/live')}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            isActive('/live') ? 'text-amber-400 font-bold' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Radio className="w-5 h-5" />
-          <span className="text-[10px]">Directs</span>
-        </button>
-
-        {/* 5. PROFIL */}
-        <button
-          onClick={() => navigate('/profile')}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            isActive('/profile') ? 'text-amber-400 font-bold' : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <User className="w-5 h-5" />
-          <span className="text-[10px]">Profil</span>
-        </button>
-      </div>
+      <button
+        onClick={() => navigate('/profile')}
+        className={`flex flex-col items-center transition-colors ${
+          isAccountActive ? 'text-amber-600 font-medium' : 'text-gray-400 hover:text-amber-600'
+        }`}
+      >
+        <UserIcon className="w-6 h-6" />
+        <span className="text-xs mt-1">Compte</span>
+      </button>
     </nav>
   );
 };

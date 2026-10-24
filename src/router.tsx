@@ -22,9 +22,13 @@ export const PanuAppRouter: React.FC<PanuAppRouterProps> = ({ searchQuery = '', 
       <Route path="/home" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
       <Route path="/watch/:id" element={<WatchPostPage />} />
       <Route path="/studio" element={<StudioPage />} />
+      <Route path="/studio-ia" element={<StudioPage />} />
       <Route path="/vod" element={<VodPage />} />
+      <Route path="/creations" element={<VodPage />} />
       <Route path="/live" element={<LiveSportsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/account" element={<ProfilePage />} />
+      <Route path="/compte" element={<ProfilePage />} />
       <Route path="/payment" element={<PaymentPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verify/:cardNumber" element={<VerifyCardPage />} />

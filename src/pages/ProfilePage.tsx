@@ -1026,25 +1026,48 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ searchQuery = '' }) =>
               >
                 {post.media_url ? (
                   post.media_type === 'video' ? (
-                    <video
-                      src={post.media_url}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <a href={`/watch/${post.id}`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                      <video
+                        src={post.media_url}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </a>
                   ) : (
-                    <img
-                      src={post.media_url}
-                      alt={post.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <a href={`/watch/${post.id}`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                      <img
+                        src={post.media_url}
+                        alt={post.title || 'Publication'}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3'; (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%2315161F" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23888" font-size="10">Image</text></svg>'; }}
+                      />
+                    </a>
                   )
                 ) : (
-                  <div style={{ padding: 10, fontSize: 10, color: '#AAA' }}>{post.title}</div>
+                  <a href={`/watch/${post.id}`} style={{ display: 'block', width: '100%', height: '100%', textDecoration: 'none' }}>
+                    <div style={{ padding: 10, fontSize: 10, color: '#CCC', background: 'rgba(229,169,60,0.05)', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden' }}>
+                      📝 {post.content || post.title}
+                    </div>
+                  </a>
                 )}
+                <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4 }}>
+                  <button
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (!confirm('Supprimer cette publication ?')) return;
+                      const { error } = await supabase.from('posts').delete().eq('id', post.id);
+                      if (!error) fetchUserPosts(userId);
+                      else alert('Erreur: ' + error.message);
+                    }}
+                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', color: '#FF4757', borderRadius: 4, width: 22, height: 22, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Supprimer"
+                  >
+                    🗑️
+                  </button>
+                </div>
                 <div style={{ position: 'absolute', bottom: 4, left: 4, right: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 9, color: '#FFF', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>❤️ {post.likes_count || 0}</span>
                   <a
                     href={`/watch/${post.id}`}
-                    onClick={(e) => { e.preventDefault(); window.location.href = `/watch/${post.id}`; }}
                     style={{ color: '#E5A93C', textDecoration: 'none', fontSize: 9, fontWeight: 700 }}
                     title="Voir et partager"
                   >

@@ -101,7 +101,7 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
   // Onglet actif : [🔥 Pour vous] [✨ Tendances] (Interface épurée style TikTok)
   const [activeTab, setActiveTab] = useState<'for_you' | 'trending'>('for_you');
   const [sortBy, setSortBy] = useState<'recent' | 'likes' | 'comments'>('recent');
-  const [showMyPublications, setShowMyPublications] = useState(false);
+  const [showMyPubFilter, setShowMyPubFilter] = useState(false);
 
   // Modales interactives
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
@@ -534,7 +534,13 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
       const { data: userData } = await supabase.auth.getUser();
       const authorId = userData?.user?.id || '00000000-0000-0000-0000-000000000001';
       let finalMediaUrl = newFeedUrl.trim();
-      let mediaType = finalMediaUrl.endsWith('.mp4') ? 'video' : 'image';
+      let mediaType = 'text';
+
+      if (!finalMediaUrl && !selectedUploadFile) {
+        mediaType = 'text';
+      } else if (finalMediaUrl && !selectedUploadFile) {
+        mediaType = finalMediaUrl.endsWith('.mp4') || finalMediaUrl.endsWith('.webm') ? 'video' : 'image';
+      }
 
       // Téléversement direct dans le stockage sécurisé
       if (selectedUploadFile) {
@@ -1227,32 +1233,57 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
                     overflow: 'hidden',
                   }}
                 >
-                  {post.media_url && (
+                  {post.media_url && post.media_type === 'video' && (
                     <video
                       src={post.media_url}
                       controls
                       playsInline
-                      style={{ width: '100%', maxHeight: 380, objectFit: 'cover' }}
+                      style={{ width: '100%', maxHeight: 380, objectFit: 'cover', backgroundColor: '#000' }}
+                    />
+                  )}
+                  {post.media_url && post.media_type === 'image' && (
+                    <img
+                      src={post.media_url}
+                      alt={post.title || 'Publication'}
+                      style={{ width: '100%', maxHeight: 500, objectFit: 'cover', cursor: 'pointer' }}
+                      onClick={() => window.open(`/watch/${post.id}`, '_self')}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement!.innerHTML = '<div style="padding:20px;text-align:center;color:#888;background:#0D0E12">📷 Image indisponible</div>';
+                      }}
                     />
                   )}
                   <div style={{ padding: 14 }}>
-                    <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{post.title}</h3>
-                    <p style={{ margin: '0 0 10px', fontSize: 12, color: '#CCC' }}>{post.content}</p>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', border: '1px solid #E5A93C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12, backgroundColor: '#1E202B', color: '#E5A93C', flexShrink: 0 }}>
+                        {post.author_avatar ? <img src={post.author_avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (post.author_name || 'P').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#FFF' }}>{post.author_name || 'Créateur PANU'}</span>
+                      {post.is_live && <span style={{ fontSize: 9, color: '#FF2E4C', fontWeight: 900, background: 'rgba(255,46,76,0.15)', padding: '1px 6px', borderRadius: 4 }}>LIVE</span>}
+                    </div>
+                    {post.title && <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{post.title}</h3>}
+                    {post.content && <p style={{ margin: '0 0 10px', fontSize: 13, color: '#CCC', lineHeight: 1.5 }}>{post.content}</p>}
+                    {!post.media_url && (
+                      <div style={{ padding: '24px 16px', background: 'rgba(229,169,60,0.05)', border: '1px solid rgba(229,169,60,0.2)', borderRadius: 10, marginBottom: 10, fontSize: 14, color: '#DDD', fontStyle: 'italic', textAlign: 'center' }}>
+                        📝 {post.content || post.title}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         onClick={() => handleToggleLike(post.id)}
                         style={{
-                          backgroundColor: 'rgba(255,255,255,0.06)',
-                          border: '1px solid rgba(255,255,255,0.15)',
-                          color: '#FFF',
+                          backgroundColor: likedPosts[post.id] ? 'rgba(255,46,76,0.15)' : 'rgba(255,255,255,0.06)',
+                          border: likedPosts[post.id] ? '1px solid #FF2E4C' : '1px solid rgba(255,255,255,0.15)',
+                          color: likedPosts[post.id] ? '#FF2E4C' : '#FFF',
                           padding: '6px 10px',
                           borderRadius: 6,
                           fontSize: 12,
                           cursor: 'pointer',
                         }}
                       >
-                        ❤️ {postLikesCount[post.id] || 0}
+                        {likedPosts[post.id] ? '❤️' : '🤍'} {postLikesCount[post.id] || 0}
                       </button>
                       <button
                         type="button"
@@ -1269,6 +1300,21 @@ export const HomePage: React.FC<HomePageProps> = ({ searchQuery = '', showMyPubl
                       >
                         💬 Commentaires
                       </button>
+                      <a
+                        href={`/watch/${post.id}`}
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          color: '#FFF',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          textDecoration: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🔗 Ouvrir
+                      </a>
                     </div>
                   </div>
                 </div>

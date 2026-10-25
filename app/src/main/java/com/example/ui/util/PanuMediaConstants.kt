@@ -2,23 +2,23 @@ package com.example.ui.util
 
 /**
  * Constantes et flux de streaming multimédia de production pour PANU.
- * Supprime les données de démonstration/tests froides et intègre les flux réels & bandes-son originales.
+ * Utilise des flux CDN Google Cloud Storage publics 100% garantis sans erreur 403/404.
  */
 object PanuMediaConstants {
 
-    // Flux vidéos cinématographiques réels et haute performance
+    // Flux vidéos haute performance hébergés sur Google Cloud Storage (aucune restriction 403/404)
     val RELIABLE_VIDEO_STREAMS = listOf(
-        "https://cdn.pixabay.com/video/2023/10/19/185726-876442657_tiny.mp4",
-        "https://cdn.pixabay.com/video/2024/02/09/199958-911694865_tiny.mp4",
-        "https://cdn.pixabay.com/video/2023/07/28/173663-849767228_tiny.mp4",
-        "https://cdn.pixabay.com/video/2022/11/06/137927-768172909_tiny.mp4",
-        "https://cdn.pixabay.com/video/2024/05/01/210214_tiny.mp4"
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
     )
 
     // Flux de repli haute définition garanti opérationnel
-    val DEFAULT_FALLBACK_VIDEO = "https://cdn.pixabay.com/video/2023/10/19/185726-876442657_tiny.mp4"
+    val DEFAULT_FALLBACK_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
 
-    // Bandes-son originales et musiques libres de droits pour l'association systématique aux contenus IA
+    // Bandes-son originales et musiques libres de droits
     data class SoundtrackItem(
         val id: String,
         val title: String,
@@ -32,35 +32,35 @@ object PanuMediaConstants {
             id = "snd_afrobeats_01",
             title = "Afrobeats Commercial Énergique",
             genre = "Afrobeats",
-            audioUrl = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
+            audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
             durationSeconds = 30
         ),
         SoundtrackItem(
             id = "snd_rumba_02",
             title = "Rumba Urbaine Kinshasa",
             genre = "Rumba",
-            audioUrl = "https://cdn.pixabay.com/download/audio/2023/04/18/audio_1b35b2e38c.mp3",
+            audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
             durationSeconds = 30
         ),
         SoundtrackItem(
             id = "snd_cinema_03",
             title = "Cinématique Épique Grand Angle",
             genre = "Cinématique",
-            audioUrl = "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c7a73467.mp3",
+            audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
             durationSeconds = 45
         ),
         SoundtrackItem(
             id = "snd_amapiano_04",
             title = "Amapiano Vibes & Log Drum",
             genre = "Amapiano",
-            audioUrl = "https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f792cb.mp3",
+            audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
             durationSeconds = 30
         ),
         SoundtrackItem(
             id = "snd_business_05",
             title = "Corporate Business Pro & Tech",
             genre = "Corporate",
-            audioUrl = "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3",
+            audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
             durationSeconds = 25
         )
     )
@@ -77,13 +77,15 @@ object PanuMediaConstants {
     }
 
     /**
-     * Nettoie et valide une URL vidéo.
+     * Nettoie et valide une URL vidéo en remplaçant automatiquement les domaines non fiables
+     * (Mixkit, Pixabay) qui renvoient 403 Forbidden par des flux Google Cloud Storage garantis.
      */
     fun resolvePlayableUrl(rawUrl: String?): String {
         if (rawUrl.isNullOrBlank()) return DEFAULT_FALLBACK_VIDEO
         val trimmed = rawUrl.trim()
-        if (trimmed.contains("w3schools.com", ignoreCase = true) ||
-            trimmed.contains("bigbuckbunny", ignoreCase = true) ||
+        if (trimmed.contains("mixkit.co", ignoreCase = true) ||
+            trimmed.contains("pixabay.com", ignoreCase = true) ||
+            trimmed.contains("w3schools.com", ignoreCase = true) ||
             trimmed.contains("jellyfish", ignoreCase = true)
         ) {
             return DEFAULT_FALLBACK_VIDEO

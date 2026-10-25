@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -81,33 +85,13 @@ import com.example.ui.theme.PanuTheme
 fun PanuTopBar(
     onSearchClick: (() -> Unit)? = null,
     onMenuClick: (() -> Unit)? = null,
+    onMessagesClick: (() -> Unit)? = null,
     canNavigateBack: Boolean = false,
     onNavigateBack: () -> Unit = {},
     featuresService: SupabasePanuFeaturesService? = null,
-    onCreditsClick: (() -> Unit)? = null,
-    onCreateClick: (() -> Unit)? = null
+    unreadMessagesCount: Int = 0
 ) {
     val colors = PanuTheme.colors
-    val creditsBalance by (featuresService?.panuCreditsBalance ?: kotlinx.coroutines.flow.MutableStateFlow(60)).collectAsState()
-    val scope = rememberCoroutineScope()
-
-    // Fetch user credits upon mount and subscribe to Supabase Realtime channels for ai_credits
-    LaunchedEffect(featuresService) {
-        if (featuresService != null) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    featuresService.fetchAndListenUserCredits()
-                    featuresService.startRealtimeCreditsSubscription()
-                } catch (_: Exception) {}
-                while (true) {
-                    try {
-                        featuresService.fetchAndListenUserCredits()
-                    } catch (_: Exception) {}
-                    kotlinx.coroutines.delay(4000L)
-                }
-            }
-        }
-    }
 
     TopAppBar(
         title = {
@@ -151,43 +135,38 @@ fun PanuTopBar(
             }
         },
         actions = {
-            // CRREDITS BADGE (ai_credits table real-time display)
-            Surface(
-                color = colors.champagneSubtle,
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne),
-                modifier = Modifier
-                    .padding(end = 4.dp)
-                    .clickable { onCreditsClick?.invoke() }
-                    .testTag("header_credits_badge")
+            // BOUTON MESSAGERIE & NOTIFICATIONS (Remplace le compteur "60" et le petit bouton "+")
+            IconButton(
+                onClick = { onMessagesClick?.invoke() },
+                modifier = Modifier.testTag("header_messages_btn")
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "🪙", fontSize = 12.sp)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "$creditsBalance",
-                        color = colors.champagne,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 12.sp,
-                        modifier = Modifier.testTag("header_credit_balance")
-                    )
-                }
-            }
-
-            // CRÉER (+)
-            if (onCreateClick != null) {
-                IconButton(
-                    onClick = onCreateClick,
-                    modifier = Modifier.testTag("header_create_btn")
+                Box(
+                    modifier = Modifier.size(36.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Créer",
-                        tint = colors.champagne
+                        imageVector = Icons.Default.Email,
+                        contentDescription = "Messages et notifications",
+                        tint = colors.champagne,
+                        modifier = Modifier.size(24.dp)
                     )
+                    if (unreadMessagesCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF2E4C)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (unreadMessagesCount > 9) "9+" else "$unreadMessagesCount",
+                                fontSize = 9.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
                 }
             }
 
@@ -231,48 +210,10 @@ data class BottomNavItem(
 fun PanuBottomNav(
     currentRoute: String?,
     isFounder: Boolean = false,
+    onCreateClick: (() -> Unit)? = null,
     onNavigate: (String) -> Unit
 ) {
     val colors = PanuTheme.colors
-
-    val items = buildList {
-        add(
-            BottomNavItem(
-                route = PanuScreen.Home.route,
-                label = "Accueil",
-                selectedIcon = Icons.Filled.Home,
-                unselectedIcon = Icons.Outlined.Home,
-                testTag = "nav_home"
-            )
-        )
-        add(
-            BottomNavItem(
-                route = PanuScreen.Studio.route,
-                label = "Studio IA",
-                selectedIcon = Icons.Filled.AutoAwesome,
-                unselectedIcon = Icons.Outlined.AutoAwesome,
-                testTag = "nav_studio"
-            )
-        )
-        add(
-            BottomNavItem(
-                route = PanuScreen.Creations.route,
-                label = "Créations",
-                selectedIcon = Icons.Filled.VideoLibrary,
-                unselectedIcon = Icons.Outlined.VideoLibrary,
-                testTag = "nav_creations"
-            )
-        )
-        add(
-            BottomNavItem(
-                route = PanuScreen.Profile.route,
-                label = "Compte",
-                selectedIcon = Icons.Filled.Person,
-                unselectedIcon = Icons.Outlined.Person,
-                testTag = "nav_profile"
-            )
-        )
-    }
 
     NavigationBar(
         containerColor = colors.surface,
@@ -282,41 +223,170 @@ fun PanuBottomNav(
             .border(width = 1.dp, color = colors.surfaceBorder)
             .testTag("panu_bottom_nav")
     ) {
-        items.forEach { item ->
-            val isSelected = when (item.route) {
-                PanuScreen.Creations.route -> currentRoute == PanuScreen.Creations.route || currentRoute == PanuScreen.Activity.route
-                else -> currentRoute == item.route
-            }
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = { onNavigate(item.route) },
-                icon = {
+        // 1. Accueil
+        val isHomeSelected = currentRoute == PanuScreen.Home.route
+        NavigationBarItem(
+            selected = isHomeSelected,
+            onClick = { onNavigate(PanuScreen.Home.route) },
+            icon = {
+                Icon(
+                    imageVector = if (isHomeSelected) Icons.Filled.Home else Icons.Outlined.Home,
+                    contentDescription = "Accueil",
+                    tint = if (isHomeSelected) colors.champagne else colors.textSecondary
+                )
+            },
+            label = {
+                Text(
+                    text = "Accueil",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = if (isHomeSelected) FontWeight.SemiBold else FontWeight.Normal
+                    ),
+                    color = if (isHomeSelected) colors.champagne else colors.textSecondary,
+                    maxLines = 1
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = colors.champagneSubtle,
+                selectedIconColor = colors.champagne,
+                selectedTextColor = colors.champagne,
+                unselectedIconColor = colors.textSecondary,
+                unselectedTextColor = colors.textSecondary
+            ),
+            modifier = Modifier.testTag("nav_home")
+        )
+
+        // 2. Studio IA / Templates
+        val isStudioSelected = currentRoute == PanuScreen.Studio.route
+        NavigationBarItem(
+            selected = isStudioSelected,
+            onClick = { onNavigate(PanuScreen.Studio.route) },
+            icon = {
+                Icon(
+                    imageVector = if (isStudioSelected) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesome,
+                    contentDescription = "Studio IA",
+                    tint = if (isStudioSelected) colors.champagne else colors.textSecondary
+                )
+            },
+            label = {
+                Text(
+                    text = "Studio IA",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = if (isStudioSelected) FontWeight.SemiBold else FontWeight.Normal
+                    ),
+                    color = if (isStudioSelected) colors.champagne else colors.textSecondary,
+                    maxLines = 1
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = colors.champagneSubtle,
+                selectedIconColor = colors.champagne,
+                selectedTextColor = colors.champagne,
+                unselectedIconColor = colors.textSecondary,
+                unselectedTextColor = colors.textSecondary
+            ),
+            modifier = Modifier.testTag("nav_studio")
+        )
+
+        // 3. GRAND BOUTON CENTRAL "+" (CRÉER)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                onClick = {
+                    if (onCreateClick != null) {
+                        onCreateClick()
+                    } else {
+                        onNavigate(PanuScreen.Create.route)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                color = colors.champagne,
+                border = BorderStroke(2.dp, Color(0xFF202330)),
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .size(width = 44.dp, height = 34.dp)
+                    .testTag("nav_create_grand_btn")
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.label,
-                        tint = if (isSelected) colors.champagne else colors.textSecondary
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Créer",
+                        tint = if (colors.isDark) Color.Black else Color.White,
+                        modifier = Modifier.size(22.dp)
                     )
-                },
-                label = {
-                    Text(
-                        text = item.label,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                        ),
-                        color = if (isSelected) colors.champagne else colors.textSecondary,
-                        maxLines = 1
-                    )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = colors.champagneSubtle,
-                    selectedIconColor = colors.champagne,
-                    selectedTextColor = colors.champagne,
-                    unselectedIconColor = colors.textSecondary,
-                    unselectedTextColor = colors.textSecondary
-                ),
-                modifier = Modifier.testTag(item.testTag)
-            )
+                }
+            }
         }
+
+        // 4. Créations
+        val isCreationsSelected = currentRoute == PanuScreen.Creations.route || currentRoute == PanuScreen.Activity.route
+        NavigationBarItem(
+            selected = isCreationsSelected,
+            onClick = { onNavigate(PanuScreen.Creations.route) },
+            icon = {
+                Icon(
+                    imageVector = if (isCreationsSelected) Icons.Filled.VideoLibrary else Icons.Outlined.VideoLibrary,
+                    contentDescription = "Créations",
+                    tint = if (isCreationsSelected) colors.champagne else colors.textSecondary
+                )
+            },
+            label = {
+                Text(
+                    text = "Créations",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = if (isCreationsSelected) FontWeight.SemiBold else FontWeight.Normal
+                    ),
+                    color = if (isCreationsSelected) colors.champagne else colors.textSecondary,
+                    maxLines = 1
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = colors.champagneSubtle,
+                selectedIconColor = colors.champagne,
+                selectedTextColor = colors.champagne,
+                unselectedIconColor = colors.textSecondary,
+                unselectedTextColor = colors.textSecondary
+            ),
+            modifier = Modifier.testTag("nav_creations")
+        )
+
+        // 5. Compte
+        val isProfileSelected = currentRoute == PanuScreen.Profile.route
+        NavigationBarItem(
+            selected = isProfileSelected,
+            onClick = { onNavigate(PanuScreen.Profile.route) },
+            icon = {
+                Icon(
+                    imageVector = if (isProfileSelected) Icons.Filled.Person else Icons.Outlined.Person,
+                    contentDescription = "Compte",
+                    tint = if (isProfileSelected) colors.champagne else colors.textSecondary
+                )
+            },
+            label = {
+                Text(
+                    text = "Compte",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = if (isProfileSelected) FontWeight.SemiBold else FontWeight.Normal
+                    ),
+                    color = if (isProfileSelected) colors.champagne else colors.textSecondary,
+                    maxLines = 1
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = colors.champagneSubtle,
+                selectedIconColor = colors.champagne,
+                selectedTextColor = colors.champagne,
+                unselectedIconColor = colors.textSecondary,
+                unselectedTextColor = colors.textSecondary
+            ),
+            modifier = Modifier.testTag("nav_profile")
+        )
     }
 }
 

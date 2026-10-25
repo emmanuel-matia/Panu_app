@@ -1,94 +1,75 @@
 package com.example.ui.theme
 
-import android.app.Activity
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+
+private val DarkColorScheme = darkColorScheme(
+    primary = PanuGold,
+    background = PanuDarkBackground,
+    surface = PanuSurfaceDark,
+    onPrimary = Color.Black,
+    onBackground = PanuTextWhite,
+    onSurface = PanuTextWhite
+)
+
+class PanuColors(
+    val materialScheme: ColorScheme,
+    val champagne: Color = PanuGold,
+    val champagneLight: Color = Color(0xFFF3C775),
+    val champagneDark: Color = Color(0xFFB57E1E),
+    val champagneSubtle: Color = Color(0x33E5A93C),
+    val emerald: Color = PanuEmerald,
+    val emeraldSubtle: Color = Color(0x3310B981),
+    val surfaceElevated: Color = Color(0xFF1E2230),
+    val surfaceBorder: Color = Color(0xFF2E3446),
+    val textPrimary: Color = PanuTextWhite,
+    val textSecondary: Color = PanuGray,
+    val textMuted: Color = Color(0xFF6B7280),
+    val isDark: Boolean = true
+) {
+    val background: Color get() = materialScheme.background
+    val surface: Color get() = materialScheme.surface
+    val error: Color get() = materialScheme.error
+    val primary: Color get() = materialScheme.primary
+    val onPrimary: Color get() = materialScheme.onPrimary
+    val onBackground: Color get() = materialScheme.onBackground
+    val onSurface: Color get() = materialScheme.onSurface
+    val outline: Color get() = materialScheme.outline
+    val secondary: Color get() = materialScheme.secondary
+}
 
 object PanuTheme {
     val colors: PanuColors
         @Composable
         @ReadOnlyComposable
-        get() = LocalPanuColors.current
+        get() = PanuColors(materialScheme = MaterialTheme.colorScheme)
 }
 
-private val PanuDarkColorScheme = darkColorScheme(
-    primary = PanuDarkChampagne,
-    onPrimary = PanuDarkBackground,
-    primaryContainer = PanuDarkChampagneSubtle,
-    onPrimaryContainer = PanuDarkChampagneLight,
-    secondary = PanuDarkChampagne,
-    onSecondary = PanuDarkBackground,
-    secondaryContainer = PanuDarkSurfaceElevated,
-    onSecondaryContainer = PanuDarkTextPrimary,
-    tertiary = PanuEmeraldLight,
-    onTertiary = PanuDarkBackground,
-    background = PanuDarkBackground,
-    onBackground = PanuDarkTextPrimary,
-    surface = PanuDarkSurface,
-    onSurface = PanuDarkTextPrimary,
-    surfaceVariant = PanuDarkSurfaceElevated,
-    onSurfaceVariant = PanuDarkTextSecondary,
-    outline = PanuDarkSurfaceBorder,
-    error = PanuErrorDark
-)
-
-private val PanuLightColorScheme = lightColorScheme(
-    primary = PanuLightChampagne,
-    onPrimary = Color.White,
-    primaryContainer = PanuLightChampagneSubtle,
-    onPrimaryContainer = PanuLightChampagneDark,
-    secondary = PanuLightChampagne,
-    onSecondary = Color.White,
-    secondaryContainer = PanuLightSurfaceElevated,
-    onSecondaryContainer = PanuLightTextPrimary,
-    tertiary = PanuEmerald,
-    onTertiary = Color.White,
-    background = PanuLightBackground,
-    onBackground = PanuLightTextPrimary,
-    surface = PanuLightSurface,
-    onSurface = PanuLightTextPrimary,
-    surfaceVariant = PanuLightSurfaceElevated,
-    onSurfaceVariant = PanuLightTextSecondary,
-    outline = PanuLightSurfaceBorder,
-    error = PanuError
-)
+val ColorScheme.champagne: Color get() = PanuGold
+val ColorScheme.champagneLight: Color get() = Color(0xFFF3C775)
+val ColorScheme.champagneDark: Color get() = Color(0xFFB57E1E)
+val ColorScheme.champagneSubtle: Color get() = Color(0x33E5A93C)
+val ColorScheme.emerald: Color get() = PanuEmerald
+val ColorScheme.emeraldSubtle: Color get() = Color(0x3310B981)
+val ColorScheme.surfaceElevated: Color get() = Color(0xFF1E2230)
+val ColorScheme.surfaceBorder: Color get() = Color(0xFF2E3446)
+val ColorScheme.textPrimary: Color get() = PanuTextWhite
+val ColorScheme.textSecondary: Color get() = PanuGray
+val ColorScheme.textMuted: Color get() = Color(0xFF6B7280)
+val ColorScheme.isDark: Boolean get() = true
 
 @Composable
 fun PanuTheme(
-    darkTheme: Boolean = false, // Mode clair par défaut pour les nouveaux utilisateurs
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val panuColors = if (darkTheme) PanuDarkPalette else PanuLightPalette
-    val colorScheme = if (darkTheme) PanuDarkColorScheme else PanuLightColorScheme
-    val view = LocalView.current
-
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as? Activity)?.window
-            if (window != null) {
-                window.statusBarColor = colorScheme.background.toArgb()
-                window.navigationBarColor = colorScheme.background.toArgb()
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.isAppearanceLightStatusBars = !darkTheme
-                insetsController.isAppearanceLightNavigationBars = !darkTheme
-            }
-        }
-    }
-
-    CompositionLocalProvider(LocalPanuColors provides panuColors) {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = Typography,
-            content = content
-        )
-    }
+    MaterialTheme(
+        colorScheme = DarkColorScheme,
+        typography = Typography,
+        content = content
+    )
 }

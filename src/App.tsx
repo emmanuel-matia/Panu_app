@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Component, ReactNode } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useLocation } from 'react-router-dom';
 import PanuAppRouter from './router';
 import { Header } from './components/Header';
 import { PanuBottomNav } from './components/nav/PanuBottomNav';
@@ -29,7 +29,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Une erreur est survenue</h2>
           <p style={{ color: '#9CA3AF', fontSize: 14, maxWidth: 400, marginBottom: 20 }}>
-            L'application a rencontre un probleme. Rafraichissez la page pour reessayer.
+            L'application a rencontré un problème. Cliquez ci-dessous pour recharger.
           </p>
           <button
             onClick={() => { this.setState({ hasError: false, message: '' }); window.location.reload(); }}
@@ -44,27 +44,60 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const LoadingScreen = () => (
-  <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0B0C12' }}>
-    <div style={{
-      width: 72, height: 72, background: '#E5A93C', borderRadius: 18,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
-      boxShadow: '0 0 40px rgba(229,169,60,0.3)',
-      animation: 'pulse 1.5s ease-in-out infinite',
-    }}>
-      <span style={{ color: '#000', fontWeight: 900, fontSize: 36 }}>P</span>
+interface AppContentProps {
+  userCredits: number;
+  setUserCredits: React.Dispatch<React.SetStateAction<number>>;
+  searchQuery: string;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  showMyPublications: boolean;
+  setShowMyPublications: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const AppContent: React.FC<AppContentProps> = ({
+  userCredits,
+  setUserCredits,
+  searchQuery,
+  setSearchQuery,
+  showMyPublications,
+  setShowMyPublications,
+}) => {
+  const location = useLocation();
+  const isImmersiveFeed =
+    location.pathname === '/' ||
+    location.pathname === '/home' ||
+    location.pathname === '/index.html' ||
+    location.pathname === '/feed' ||
+    location.pathname === '';
+
+  return (
+    <div className="flex flex-col min-h-screen bg-[#0B0C12] text-white">
+      {/* N'afficher le Header classique QUE sur les pages secondaires (ex: profil, login) */}
+      {!isImmersiveFeed && (
+        <Header
+          userBalance={userCredits}
+          onBalanceUpdate={setUserCredits}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          showMyPublications={showMyPublications}
+          onToggleMyPublications={() => setShowMyPublications(!showMyPublications)}
+        />
+      )}
+
+      {/* Sur la page d'accueil, le lecteur immersif prend 100% de la hauteur sans padding */}
+      <main className={isImmersiveFeed ? 'w-full h-screen overflow-hidden' : 'flex-grow pb-20'}>
+        <PanuAppRouter searchQuery={searchQuery} showMyPublications={showMyPublications} />
+      </main>
+
+      {/* Sur les pages secondaires, afficher la barre de navigation inférieure commune */}
+      {!isImmersiveFeed && <PanuBottomNav />}
     </div>
-    <div style={{ color: '#E5A93C', fontWeight: 900, fontSize: 24, letterSpacing: 2, marginBottom: 8 }}>PANU</div>
-    <div style={{ color: '#6B7280', fontSize: 13, fontWeight: 500 }}>Chargement du studio creatif...</div>
-    <style>{`@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.95); opacity: 0.8; } }`}</style>
-  </div>
-);
+  );
+};
 
 export const App: React.FC = () => {
   const [userCredits, setUserCredits] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMyPublications, setShowMyPublications] = useState(false);
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const fetchCredits = async (userId: string) => {
@@ -82,17 +115,9 @@ export const App: React.FC = () => {
       }
     };
 
-    const init = async () => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) await fetchCredits(data.user.id);
-      } catch (e) {
-        console.warn('Auth check failed:', e);
-      }
-      setIsReady(true);
-    };
-
-    init();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.id) fetchCredits(data.user.id);
+    });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.id) {
@@ -105,28 +130,18 @@ export const App: React.FC = () => {
     return () => { listener.subscription.unsubscribe(); };
   }, []);
 
-  if (!isReady) return <LoadingScreen />;
-
   return (
     <ErrorBoundary>
       <BrowserRouter>
         <NotificationProvider>
-          <div className="flex flex-col min-h-screen bg-[#0B0C12] text-white">
-            <Header
-              userBalance={userCredits}
-              onBalanceUpdate={setUserCredits}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              showMyPublications={showMyPublications}
-              onToggleMyPublications={() => setShowMyPublications(!showMyPublications)}
-            />
-
-            <main className="flex-grow pb-24">
-              <PanuAppRouter searchQuery={searchQuery} showMyPublications={showMyPublications} />
-            </main>
-
-            <PanuBottomNav />
-          </div>
+          <AppContent
+            userCredits={userCredits}
+            setUserCredits={setUserCredits}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            showMyPublications={showMyPublications}
+            setShowMyPublications={setShowMyPublications}
+          />
         </NotificationProvider>
       </BrowserRouter>
     </ErrorBoundary>
@@ -134,4 +149,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

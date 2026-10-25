@@ -20,6 +20,8 @@ export const PanuAppRouter: React.FC<PanuAppRouterProps> = ({ searchQuery = '', 
     <Routes>
       <Route path="/" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
       <Route path="/home" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
+      <Route path="/index.html" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
+      <Route path="/feed" element={<HomePage searchQuery={searchQuery} showMyPublications={showMyPublications} />} />
       <Route path="/watch/:id" element={<WatchPostPage />} />
       <Route path="/studio" element={<StudioPage />} />
       <Route path="/studio-ia" element={<StudioPage />} />

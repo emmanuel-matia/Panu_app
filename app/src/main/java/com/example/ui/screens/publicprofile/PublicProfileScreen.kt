@@ -60,7 +60,6 @@ import com.example.data.repository.ProfileRepository
 import com.example.ui.components.PanuAvatar
 import com.example.ui.components.PanuRoleBadge
 import com.example.ui.components.PanuTopBar
-import com.example.ui.screens.home.PostCard
 import com.example.ui.theme.PanuGold
 import com.example.ui.theme.PanuGoldDark
 import com.example.ui.theme.PanuGoldLight
@@ -319,6 +318,37 @@ fun PublicProfileScreen(
                         PostCard(post = post, onAuthorClick = {})
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun PostCard(
+    post: com.example.data.model.Post,
+    onAuthorClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = PanuSurfaceElevated),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = post.title ?: post.content.take(40),
+                style = MaterialTheme.typography.titleMedium,
+                color = PanuTextPrimaryDark,
+                fontWeight = FontWeight.Bold
+            )
+            if (!post.title.isNullOrEmpty() && post.content.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = post.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PanuTextSecondaryDark
+                )
             }
         }
     }

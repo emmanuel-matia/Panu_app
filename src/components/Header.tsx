@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, Wallet, LogOut, Home, Sparkles, PlaySquare, User, Bell, CheckCheck, Coins } from 'lucide-react';
+import { Search, Menu, Wallet, LogOut, Home, Sparkles, PlaySquare, User, Bell, CheckCheck, Coins, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useNotifications } from '../context/NotificationContext';
 import { CreditRechargeModal } from './payment/CreditRechargeModal';
@@ -161,29 +161,20 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </button>
 
-              {/* AFFICHAGE DES CRÉDITS IA */}
-              <div 
-                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer transition-all ${
-                  balance < 50 
-                    ? 'bg-red-500/20 border border-red-500/40 hover:bg-red-500/30' 
-                    : 'bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20'
-                }`}
-                onClick={() => setShowRechargeModal(true)}
-                title={balance < 50 ? "Solde faible ! Recharger" : "Recharger mes crédits IA"}
+              {/* BOUTON DE MESSAGERIE & NOTIFICATIONS (Remplace le compteur de crédits et le bouton +) */}
+              <button 
+                onClick={() => setShowNotificationDrawer(true)}
+                className="relative p-2.5 text-amber-500 hover:text-white hover:bg-white/5 rounded-full transition-all"
+                aria-label="Messages et notifications"
+                title="Messages et notifications"
               >
-                <Coins className={`w-3.5 h-3.5 ${balance < 50 ? 'text-red-400' : 'text-amber-500'}`} />
-                <div className="flex flex-col -space-y-0.5">
-                  <span className="text-xs font-black text-white">{balance}</span>
-                  {balance < 50 && (
-                    <span className="text-[8px] font-black text-red-400 animate-pulse uppercase leading-none">Faible</span>
-                  )}
-                </div>
-                {balance < 50 && (
-                  <span className="ml-1 text-[10px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-md">
-                    ACHETER
+                <MessageSquare className="w-5 h-5 text-amber-500" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#10121A] animate-pulse shadow-lg shadow-red-500/50">
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
-              </div>
+              </button>
 
               {/* CLOCHE DE NOTIFICATIONS AVEC BADGE EN TEMPS RÉEL */}
               <button 

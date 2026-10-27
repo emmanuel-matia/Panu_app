@@ -328,6 +328,28 @@ private fun PanuAiVideoStudioTab(
     var generationStatusText by remember { mutableStateOf<String?>(null) }
     var generationError by remember { mutableStateOf<String?>(null) }
 
+    var isEdgeFunctionGenerating by remember { mutableStateOf(false) }
+    var edgeFunctionResultData by remember { mutableStateOf<String?>(null) }
+    var edgeFunctionError by remember { mutableStateOf<String?>(null) }
+
+    fun invokeEdgeFunctionGenerateContent() {
+        val targetPrompt = promptText.trim()
+        if (targetPrompt.isBlank() || isEdgeFunctionGenerating) return
+        isEdgeFunctionGenerating = true
+        edgeFunctionError = null
+        edgeFunctionResultData = null
+
+        scope.launch {
+            val res = featuresService?.invokeGenerateContentEdgeFunction(targetPrompt)
+            isEdgeFunctionGenerating = false
+            if (res != null && res.isSuccess) {
+                edgeFunctionResultData = res.getOrNull()
+            } else {
+                edgeFunctionError = res?.exceptionOrNull()?.localizedMessage ?: "Échec appel Edge Function generate-content"
+            }
+        }
+    }
+
     // Nouveaux états et launchers pour le Module Nouveau Projet & Éditeur Mobile Réel
     var showNewProjectChooser by remember { mutableStateOf(false) }
     var activeCameraMode by remember { mutableStateOf<Boolean?>(null) }
@@ -799,6 +821,53 @@ private fun PanuAiVideoStudioTab(
                             modifier = Modifier.align(Alignment.End)
                         ) {
                             Text("Réessayer", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                }
+
+                // Bouton Edge Function generate-content
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { invokeEdgeFunctionGenerateContent() },
+                    enabled = !isEdgeFunctionGenerating && promptText.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("btn_edge_function_generate_content"),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.surfaceElevated),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne)
+                ) {
+                    if (isEdgeFunctionGenerating) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = colors.champagne, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Appel Edge Function...", color = colors.champagne, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("⚡ Invoquer Edge Function generate-content", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+
+                // Espace de résultat prévu pour afficher data.data
+                if (edgeFunctionResultData != null || edgeFunctionError != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth().testTag("card_edge_function_result"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.surface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (edgeFunctionError != null) Color(0xFFFF5252) else colors.champagne)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = if (edgeFunctionError != null) "❌ Erreur Edge Function" else "✨ Résultat (data.data) :",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (edgeFunctionError != null) Color(0xFFFF8A80) else colors.champagne
+                            )
+                            Text(
+                                text = edgeFunctionError ?: edgeFunctionResultData ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textPrimary
+                            )
                         }
                     }
                 }

@@ -10,6 +10,7 @@ plugins {
 android {
     namespace = "com.example"
     compileSdk = 35
+    buildToolsVersion = "34.0.0"
 
     defaultConfig {
         applicationId = "com.example"
@@ -20,13 +21,21 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GEMINI_API_KEY", "\"\"")
-        buildConfigField("String", "ANTHROPIC_API_KEY", "\"\"")
-        buildConfigField("String", "FAL_KEY", "\"\"")
-        buildConfigField("String", "REPLICATE_API_KEY", "\"\"")
-        buildConfigField("String", "NEXT_PUBLIC_LIVEKIT_WS_URL", "\"wss://panu-live-demo.livekit.cloud\"")
-        buildConfigField("String", "SUPABASE_URL", "\"https://example.supabase.co\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"\"")
+        val envGeminiKey = (project.findProperty("GEMINI_API_KEY") as String?) ?: System.getenv("GEMINI_API_KEY") ?: ""
+        val envAnthropicKey = (project.findProperty("ANTHROPIC_API_KEY") as String?) ?: System.getenv("ANTHROPIC_API_KEY") ?: ""
+        val envFalKey = (project.findProperty("FAL_KEY") as String?) ?: System.getenv("FAL_KEY") ?: ""
+        val envReplicateKey = (project.findProperty("REPLICATE_API_KEY") as String?) ?: System.getenv("REPLICATE_API_KEY") ?: ""
+        val envLivekitUrl = (project.findProperty("NEXT_PUBLIC_LIVEKIT_WS_URL") as String?) ?: System.getenv("NEXT_PUBLIC_LIVEKIT_WS_URL") ?: "wss://panu-live-demo.livekit.cloud"
+        val envSupabaseUrl = (project.findProperty("SUPABASE_URL") as String?) ?: System.getenv("SUPABASE_URL") ?: "https://xscnbjmiinznzepxzcvn.supabase.co"
+        val envSupabaseKey = (project.findProperty("SUPABASE_ANON_KEY") as String?) ?: System.getenv("SUPABASE_ANON_KEY") ?: "sb_publishable_oiSjeHoC_1HnBPIUbfs_4g_dmwCUtyQ"
+
+        buildConfigField("String", "GEMINI_API_KEY", "\"$envGeminiKey\"")
+        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$envAnthropicKey\"")
+        buildConfigField("String", "FAL_KEY", "\"$envFalKey\"")
+        buildConfigField("String", "REPLICATE_API_KEY", "\"$envReplicateKey\"")
+        buildConfigField("String", "NEXT_PUBLIC_LIVEKIT_WS_URL", "\"$envLivekitUrl\"")
+        buildConfigField("String", "SUPABASE_URL", "\"$envSupabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$envSupabaseKey\"")
     }
 
     signingConfigs {

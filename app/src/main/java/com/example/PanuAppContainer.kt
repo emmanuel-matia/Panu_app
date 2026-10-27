@@ -38,36 +38,40 @@ class PanuAppContainer(context: Context) {
     private val appCtx: Context = context.applicationContext
 
     init {
-        // Configuration globale du cache d'images/miniatures Coil (Mémoire + Disque 100 Mo)
-        // Garantit un affichage instantané des visuels même sur connexion très lente (2G/3G)
-        val fastImageHttpClient = OkHttpClient.Builder()
-            .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
-            .connectTimeout(6, TimeUnit.SECONDS)
-            .readTimeout(8, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
-
-        Coil.setImageLoader(
-            ImageLoader.Builder(appCtx)
-                .okHttpClient(fastImageHttpClient)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .networkCachePolicy(CachePolicy.ENABLED)
-                .memoryCache {
-                    MemoryCache.Builder(appCtx)
-                        .maxSizePercent(0.25)
-                        .build()
-                }
-                .diskCache {
-                    DiskCache.Builder()
-                        .directory(appCtx.cacheDir.resolve("panu_fast_image_cache"))
-                        .maxSizeBytes(100L * 1024 * 1024) // 100 MB
-                        .build()
-                }
-                .crossfade(120)
-                .respectCacheHeaders(false)
+        try {
+            // Configuration globale du cache d'images/miniatures Coil (Mémoire + Disque 100 Mo)
+            // Garantit un affichage instantané des visuels même sur connexion très lente (2G/3G)
+            val fastImageHttpClient = OkHttpClient.Builder()
+                .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
+                .connectTimeout(6, TimeUnit.SECONDS)
+                .readTimeout(8, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
                 .build()
-        )
+
+            Coil.setImageLoader(
+                ImageLoader.Builder(appCtx)
+                    .okHttpClient(fastImageHttpClient)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .networkCachePolicy(CachePolicy.ENABLED)
+                    .memoryCache {
+                        MemoryCache.Builder(appCtx)
+                            .maxSizePercent(0.25)
+                            .build()
+                    }
+                    .diskCache {
+                        DiskCache.Builder()
+                            .directory(appCtx.cacheDir.resolve("panu_fast_image_cache"))
+                            .maxSizeBytes(100L * 1024 * 1024) // 100 MB
+                            .build()
+                    }
+                    .crossfade(120)
+                    .respectCacheHeaders(false)
+                    .build()
+            )
+        } catch (_: Throwable) {
+            // Fallback safe: Coil retains standard built-in loader
+        }
     }
 
     // Initialisation paresseuse (by lazy) pour ouverture instantanée (< 5ms) du thread principal UI

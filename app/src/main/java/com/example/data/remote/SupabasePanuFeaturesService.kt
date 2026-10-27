@@ -1735,4 +1735,44 @@ class SupabasePanuFeaturesService(
             )
         )
     }
+
+    /**
+     * Appelle l'Edge Function Supabase `generate-content` en transmettant le texte saisi :
+     * supabase.functions.invoke('generate-content', { body: { prompt: userPrompt } })
+     * puis extrait et renvoie `data.data` dans l'espace de résultat prévu.
+     */
+    suspend fun invokeGenerateContentEdgeFunction(prompt: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val payload = JSONObject().apply {
+                put("prompt", prompt)
+            }
+            val resp = client.execute(
+                endpoint = "/functions/v1/generate-content",
+                method = "POST",
+                jsonBody = payload.toString()
+            )
+            when (resp) {
+                is SupabaseResponse.Success -> {
+                    val json = resp.asJsonObject()
+                    val dataObj = json?.optJSONObject("data")
+                    val resultText = if (dataObj != null && dataObj.has("data")) {
+                        dataObj.optString("data")
+                    } else if (json != null && json.has("data")) {
+                        val inner = json.get("data")
+                        if (inner is JSONObject) inner.optString("data", inner.toString()) else inner.toString()
+                    } else if (json != null && json.has("result")) {
+                        json.optString("result")
+                    } else {
+                        resp.body
+                    }
+                    Result.success(resultText.ifBlank { resp.body })
+                }
+                is SupabaseResponse.Error -> Result.failure(Exception(resp.message))
+                is SupabaseResponse.NetworkError -> Result.failure(Exception(resp.message))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
+

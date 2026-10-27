@@ -1,3 +1,4 @@
+# Android
 *.iml
 .gradle
 .kotlin
@@ -10,9 +11,16 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
 .env
 debug.keystore
+
+# Node & Web
+node_modules/
+dist/
+.vite/
+.DS_Store

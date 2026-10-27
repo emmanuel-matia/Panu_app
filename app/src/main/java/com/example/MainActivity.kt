@@ -24,6 +24,7 @@ import com.example.ui.screens.profile.ProfileScreen
 import com.example.ui.screens.publicprofile.PublicProfileScreen
 import com.example.ui.screens.settings.SupabaseSettingsScreen
 import com.example.ui.screens.studio.StudioScreen
+import com.example.ui.screens.verify.VerifyMemberCardScreen
 import com.example.ui.screens.vod.VideoPlayerScreen
 import com.example.ui.theme.PanuTheme
 
@@ -77,6 +78,7 @@ fun PanuAppNavHost(container: PanuAppContainer) {
     var currentRoute by remember { mutableStateOf(PanuScreen.Home.route) }
     var selectedUsername by remember { mutableStateOf("") }
     var selectedPlayerUrl by remember { mutableStateOf("") }
+    var selectedCardNumber by remember { mutableStateOf("PANU-FND-001") }
 
     val currentRole by container.sessionManager.currentUserRole.collectAsState()
     val currentUserEmail by container.sessionManager.currentUserEmail.collectAsState()
@@ -91,7 +93,16 @@ fun PanuAppNavHost(container: PanuAppContainer) {
     }
 
     fun navigateTo(route: String) {
+        Log.d("PanuNav", "Navigating to route: $route")
         when {
+            route.startsWith("verify/") -> {
+                selectedCardNumber = try {
+                    java.net.URLDecoder.decode(route.removePrefix("verify/"), "UTF-8")
+                } catch (_: Exception) {
+                    route.removePrefix("verify/")
+                }
+                currentRoute = "verify"
+            }
             route.startsWith("public_profile/") -> {
                 selectedUsername = route.removePrefix("public_profile/")
                 currentRoute = route
@@ -104,17 +115,26 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 }
                 currentRoute = "vod_player"
             }
-            route == "live" -> {
+            route == "live" || route == PanuScreen.LiveSports.route -> {
                 currentRoute = PanuScreen.LiveSports.route
             }
-            route == "studio" -> {
+            route == "studio" || route == PanuScreen.Studio.route -> {
                 currentRoute = PanuScreen.Studio.route
             }
-            route == "profile" -> {
+            route == "profile" || route == PanuScreen.Profile.route -> {
                 currentRoute = PanuScreen.Profile.route
             }
-            route == "home" -> {
+            route == "home" || route == PanuScreen.Home.route -> {
                 currentRoute = PanuScreen.Home.route
+            }
+            route == "create" || route == PanuScreen.Create.route -> {
+                currentRoute = PanuScreen.Create.route
+            }
+            route == "creations" || route == "activity" || route == PanuScreen.Creations.route || route == PanuScreen.Activity.route -> {
+                currentRoute = PanuScreen.Creations.route
+            }
+            route == "settings" || route == PanuScreen.Settings.route -> {
+                currentRoute = PanuScreen.Settings.route
             }
             else -> {
                 currentRoute = route
@@ -192,6 +212,13 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 onNavigateBack = { currentRoute = PanuScreen.Profile.route },
                 onSavedSuccess = { currentRoute = PanuScreen.Profile.route },
                 onNavigateToSettings = { currentRoute = PanuScreen.Settings.route }
+            )
+        }
+        currentRoute == "verify" -> {
+            VerifyMemberCardScreen(
+                initialCardNumber = selectedCardNumber,
+                featuresService = container.panuFeaturesService,
+                onNavigateBack = { currentRoute = PanuScreen.Home.route }
             )
         }
         currentRoute.startsWith("public_profile/") -> {

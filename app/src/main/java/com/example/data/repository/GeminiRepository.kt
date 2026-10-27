@@ -62,6 +62,26 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
         generateFallbackCinemaProduction(concept, genre)
     }
 
+    suspend fun generateContent(prompt: String): String = withContext(Dispatchers.IO) {
+        val cleanPrompt = prompt.trim()
+        if (cleanPrompt.isBlank()) return@withContext "Veuillez saisir un texte ou une idée pour lancer la création."
+
+        if (resolvedApiKey.isNotBlank() && !resolvedApiKey.startsWith("YOUR_")) {
+            try {
+                val request = ContentRequest(listOf(Content(listOf(Part(cleanPrompt)))))
+                val response = apiService.generateContent(resolvedApiKey, request)
+                val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                if (!text.isNullOrBlank()) {
+                    return@withContext text
+                }
+            } catch (_: Exception) {
+                // Fallback direct
+            }
+        }
+
+        generateScenario(cleanPrompt)
+    }
+
     private fun generateFallbackCinemaProduction(concept: String, genre: String): String {
         val cleanConcept = concept.ifBlank { "Métropole africaine moderne au coucher du soleil, innovation et héritage royal" }
         return """

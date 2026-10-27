@@ -409,6 +409,27 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Voir mon profil public partageable", fontWeight = FontWeight.Bold)
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Button to request / view member card / accreditation pass ("Demander mon billet")
+                    Button(
+                        onClick = {
+                            onNavigate("verify/PANU-FND-001")
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("profile_request_billet_btn"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.champagne,
+                            contentColor = if (colors.isDark) colors.background else androidx.compose.ui.graphics.Color.White
+                        )
+                    ) {
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("🎫 Demander mon billet / Pass", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 

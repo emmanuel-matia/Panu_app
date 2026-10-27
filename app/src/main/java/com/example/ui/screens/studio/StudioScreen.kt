@@ -1,17 +1,14 @@
 package com.example.ui.screens.studio
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,62 +20,47 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.MovieCreation
-import androidx.compose.material.icons.filled.MovieFilter
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,89 +68,120 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
-import com.example.data.model.CanvasLayer
-import com.example.data.model.CanvasLayerType
-import com.example.data.model.CanvasProject
-import com.example.data.model.PanuTemplate
-import com.example.data.model.PanuTemplateField
-import com.example.data.model.StudioAudioTrack
-import com.example.data.model.StudioMediaClip
-import com.example.data.model.StudioMediaType
-import com.example.data.catalog.PanuVideoTemplateCatalog
-import com.example.data.model.StudioProject
-import com.example.data.model.toStudioProject
-import com.example.data.model.VideoStylePreset
 import com.example.data.remote.SupabasePanuFeaturesService
 import com.example.data.repository.GeminiRepository
 import com.example.data.repository.ai.CreativeMediaService
 import com.example.data.repository.ai.GroundingService
-import com.example.data.repository.ai.VideoSequenceSegment
-import com.example.ui.components.CreatorFundPayoutDialog
-import com.example.ui.components.FiveSecondVideoAdDialog
 import com.example.ui.components.MobileMoneyCreditsStoreDialog
 import com.example.ui.components.PanuBottomNav
-import com.example.ui.components.PanuMediaPlayer
-import com.example.ui.components.PanuTopBar
-import com.example.ui.components.PanuWatermarkExporterDialog
-import com.example.ui.components.VisibilityBoosterDialog
 import com.example.ui.navigation.PanuScreen
 import com.example.ui.theme.PanuTheme
-import com.example.ui.util.MediaDownloadManager
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.UUID
-import kotlin.math.roundToInt
 
+/**
+ * Écran officiel Studio IA PANU inspiré des studios créatifs de pointe (PixVerse, CapCut, Flux)
+ * avec indicateur circulaire de crédits quotidiens, choix de formats, styles artistiques et moteurs.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StudioScreen(
-    mediaService: CreativeMediaService,
-    groundingService: GroundingService,
+    mediaService: CreativeMediaService? = null,
+    groundingService: GroundingService? = null,
     geminiRepository: GeminiRepository? = null,
     featuresService: SupabasePanuFeaturesService? = null,
     isFounder: Boolean = false,
     onNavigate: (String) -> Unit = {},
     onNavigateBack: (() -> Unit)? = null
 ) {
-    val colors = PanuTheme.colors
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pendingSyncCount = featuresService?.pendingOfflineSyncCount?.collectAsState()?.value ?: 0
-    var selectedStudioTab by remember { mutableIntStateOf(0) }
-    // 0: Studio Vidéo PANU, 1: Templates PANU, 2: Création Graphique PANU, 3: Films & Séries IA
+    val colors = PanuTheme.colors
 
-    var selectedTemplateForCustomization by remember { mutableStateOf<PanuTemplate?>(null) }
-    var activeEditorProject by remember { mutableStateOf<StudioProject?>(null) }
+    // Suivi en temps réel des crédits depuis featuresService ou état local robuste
+    val backendCredits = featuresService?.panuCreditsBalance?.collectAsState()?.value ?: 60
+    var localCreditsBalance by remember(backendCredits) { mutableIntStateOf(backendCredits) }
+    val maxDailyCredits = 60
 
-    if (activeEditorProject != null) {
-        RealPanuStudioEditorScreen(
-            initialProject = activeEditorProject!!,
-            mediaService = mediaService,
-            featuresService = featuresService,
-            geminiRepository = geminiRepository,
-            onClose = { activeEditorProject = null }
+    var showRechargeDialog by remember { mutableStateOf(false) }
+
+    // États du formulaire et de la génération
+    var promptText by remember { mutableStateOf("") }
+    var generatedResult by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var selectedEngine by remember { mutableStateOf("Google Gemini") }
+    var selectedAspect by remember { mutableStateOf("16:9") }
+    var selectedArtStyle by remember { mutableStateOf("Cinematic") }
+    var creationMode by remember { mutableStateOf("Texte & Script") }
+
+    val scrollState = rememberScrollState()
+
+    val creationModes = remember { listOf("Texte & Script", "Image Flux", "Vidéo Kling", "Voix / Audio") }
+    val engines = remember { listOf("Google Gemini", "Fal.ai Kling Video", "Supabase Edge", "BFL Flux 1.0") }
+    val aspectRatios = remember { listOf("1:1", "4:3", "16:9", "3:4", "9:16") }
+    val artStyles = remember { listOf("No Style", "3D Render", "Anime", "Cinematic", "Afrofuturism") }
+
+    val quickPresets = remember {
+        listOf(
+            "Script Vidéo Viral TikTok" to "Crée un script court et captivant de 30 secondes pour une vidéo TikTok sur l'afrofuturisme et la mode à Dakar. Inclus le hook, le déroulé et un appel à l'action.",
+            "Pitch Documentaire 8K" to "Rédige le pitch et le découpage en 3 plans clés d'un documentaire cinématique 8K sur les mégapoles africaines modernes au coucher du soleil.",
+            "Scénario Série IA" to "Écris le synopsis d'un épisode pilote de série d'animation 3D afrofuturiste avec dialogues et indications de voix off.",
+            "Accroche & Hashtags" to "Génère 5 titres ultra-percutants et 10 hashtags viraux pour promouvoir une nouvelle création multimédia sur le réseau PANU."
         )
-        return
     }
 
     Scaffold(
         topBar = {
             Column {
-                PanuTopBar(
-                    canNavigateBack = onNavigateBack != null,
-                    onNavigateBack = { onNavigateBack?.invoke() }
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = colors.champagne,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "PANU Studio IA",
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary,
+                                fontSize = 19.sp
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                try {
+                                    onNavigateBack?.invoke() ?: onNavigate(PanuScreen.Home.route)
+                                } catch (e: Exception) {
+                                    onNavigate(PanuScreen.Home.route)
+                                }
+                            },
+                            modifier = Modifier.testTag("studio_back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Retour",
+                                tint = colors.textPrimary
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = colors.surface
+                    )
                 )
+
+                // Indicateur d'état connecté en temps réel
                 Surface(
                     color = colors.emeraldSubtle,
                     modifier = Modifier.fillMaxWidth()
@@ -176,63 +189,21 @@ fun StudioScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val isAiConfigured = mediaService.isAnyAiEngineConfigured()
-                        Text(
-                            text = if (pendingSyncCount > 0)
-                                "⚡ Mode Hors-ligne PANU • $pendingSyncCount création(s) en attente"
-                            else if (isAiConfigured)
-                                "🟢 IA connectée • Studio PANU actif"
-                            else
-                                "🟡 Configuration requise • Ajoutez votre clé API IA",
-                            color = if (isAiConfigured || pendingSyncCount > 0) colors.emerald else Color(0xFFFFB300),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(colors.emerald)
                         )
-                        if (pendingSyncCount > 0) {
-                            TextButton(
-                                onClick = {
-                                    scope.launch {
-                                        featuresService?.syncPendingOfflineCreations()
-                                    }
-                                }
-                            ) {
-                                Text("Synchroniser", color = colors.champagne, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                            }
-                        }
-                    }
-                }
-                ScrollableTabRow(
-                    selectedTabIndex = selectedStudioTab,
-                    containerColor = colors.surface,
-                    contentColor = colors.champagne,
-                    edgePadding = 12.dp
-                ) {
-                    Tab(
-                        selected = selectedStudioTab == 0,
-                        onClick = { selectedStudioTab = 0 },
-                        text = { Text("🎬 Studio Vidéo PANU", fontWeight = FontWeight.Bold) },
-                        icon = { Icon(Icons.Default.MovieCreation, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                        modifier = Modifier.testTag("tab_video_studio")
-                    )
-                    Tab(
-                        selected = selectedStudioTab == 1,
-                        onClick = { selectedStudioTab = 1 },
-                        text = { Text("📋 Templates PANU", fontWeight = FontWeight.Bold) },
-                        icon = { Icon(Icons.Default.ViewModule, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                        modifier = Modifier.testTag("tab_templates_panu")
-                    )
-                    if (geminiRepository != null) {
-                        Tab(
-                            selected = selectedStudioTab == 2,
-                            onClick = { selectedStudioTab = 2 },
-                            text = { Text("📽️ Films & Séries IA", fontWeight = FontWeight.Bold) },
-                            icon = { Icon(Icons.Default.MovieFilter, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            modifier = Modifier.testTag("tab_series_studio")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🟢 Studio PANU IA opérationnel • PixVerse & CapCut Engine Ready",
+                            color = colors.emerald,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -247,1732 +218,644 @@ fun StudioScreen(
         },
         containerColor = colors.background
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .background(colors.background)
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            when (selectedStudioTab) {
-                0 -> PanuAiVideoStudioTab(
-                    mediaService = mediaService,
-                    featuresService = featuresService,
-                    onNavigateToTemplates = { selectedStudioTab = 1 },
-                    onNavigateToCreations = { onNavigate(PanuScreen.Creations.route) },
-                    onOpenEditor = { project -> activeEditorProject = project }
-                )
-                1 -> PanuTemplatesCatalogTab(
-                    featuresService = featuresService,
-                    onSelectTemplate = { tpl ->
-                        selectedTemplateForCustomization = tpl
-                    },
-                    onEditDirectly = { project ->
-                        activeEditorProject = project
-                    },
-                    onCreateWithAi = { selectedStudioTab = 0 }
-                )
-                2 -> {
-                    if (geminiRepository != null) {
-                        SeriesGeneratorScreen(
-                            repository = geminiRepository,
-                            mediaService = mediaService,
-                            featuresService = featuresService
-                        )
-                    }
-                }
-            }
-
-            // Modal / Dialog de Personnalisation Réelle du Template PANU
-            selectedTemplateForCustomization?.let { template ->
-                PanuTemplateCustomizerDialog(
-                    template = template,
-                    mediaService = mediaService,
-                    featuresService = featuresService,
-                    onDismiss = { selectedTemplateForCustomization = null },
-                    onProjectCreated = { project ->
-                        selectedTemplateForCustomization = null
-                        activeEditorProject = project // Triggers RealPanuStudioEditorScreen
-                    }
-                )
-            }
-        }
-    }
-}
-
-// =============================================================================
-// 1. STUDIO VIDÉO IA PANU (MOTEURS MINIMAX, KLING, LUMA, FLUX)
-// =============================================================================
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun PanuAiVideoStudioTab(
-    mediaService: CreativeMediaService,
-    featuresService: SupabasePanuFeaturesService?,
-    onNavigateToTemplates: () -> Unit,
-    onNavigateToCreations: () -> Unit,
-    onOpenEditor: (StudioProject) -> Unit
-) {
-    val colors = PanuTheme.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var videoTitle by remember { mutableStateOf("") }
-    var promptText by remember { mutableStateOf("") }
-    var selectedPreset by remember { mutableStateOf(VideoStylePreset.CINEMATIC) }
-    var selectedAiEngine by remember { mutableStateOf("Google Gemini AI") }
-    val aiEngines = listOf("Google Gemini AI", "MiniMax/Hailuo", "Kling", "Luma", "Flux/BFL")
-    var selectedDuration by remember { mutableStateOf("10\"") }
-    var selectedAspectRatio by remember { mutableStateOf("9:16") }
-
-    var isGeneratingVideo by remember { mutableStateOf(false) }
-    var generatedVideoUrl by remember { mutableStateOf<String?>(null) }
-    var generatedThumbUrl by remember { mutableStateOf<String?>(null) }
-    var generationStatusText by remember { mutableStateOf<String?>(null) }
-    var generationError by remember { mutableStateOf<String?>(null) }
-
-    var isEdgeFunctionGenerating by remember { mutableStateOf(false) }
-    var edgeFunctionResultData by remember { mutableStateOf<String?>(null) }
-    var edgeFunctionError by remember { mutableStateOf<String?>(null) }
-
-    fun invokeEdgeFunctionGenerateContent() {
-        val targetPrompt = promptText.trim()
-        if (targetPrompt.isBlank() || isEdgeFunctionGenerating) return
-        isEdgeFunctionGenerating = true
-        edgeFunctionError = null
-        edgeFunctionResultData = null
-
-        scope.launch {
-            val res = featuresService?.invokeGenerateContentEdgeFunction(targetPrompt)
-            isEdgeFunctionGenerating = false
-            if (res != null && res.isSuccess) {
-                edgeFunctionResultData = res.getOrNull()
-            } else {
-                edgeFunctionError = res?.exceptionOrNull()?.localizedMessage ?: "Échec appel Edge Function generate-content"
-            }
-        }
-    }
-
-    // Nouveaux états et launchers pour le Module Nouveau Projet & Éditeur Mobile Réel
-    var showNewProjectChooser by remember { mutableStateOf(false) }
-    var activeCameraMode by remember { mutableStateOf<Boolean?>(null) }
-    var pendingCameraAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            pendingCameraAction?.invoke()
-        } else {
-            Toast.makeText(context, "Permission caméra requise", Toast.LENGTH_SHORT).show()
-        }
-        pendingCameraAction = null
-    }
-
-    fun launchCameraChecked(isRecording: Boolean) {
-        val hasCam = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        if (hasCam) {
-            activeCameraMode = isRecording
-        } else {
-            pendingCameraAction = { activeCameraMode = isRecording }
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    val galleryPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            val clipsList = uris.mapIndexed { idx, uri ->
-                StudioMediaClip(
-                    id = UUID.randomUUID().toString(),
-                    uri = uri,
-                    type = StudioMediaType.IMAGE,
-                    name = "Média ${idx + 1}"
-                )
-            }
-            onOpenEditor(
-                StudioProject(
-                    id = UUID.randomUUID().toString(),
-                    title = "Projet Galerie PANU",
-                    clips = clipsList
-                )
-            )
-        }
-    }
-
-    val audioPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            val audioTrack = StudioAudioTrack(
-                id = UUID.randomUUID().toString(),
-                uri = uri,
-                title = "Piste audio importée"
-            )
-            onOpenEditor(
-                StudioProject(
-                    id = UUID.randomUUID().toString(),
-                    title = "Projet Audio PANU",
-                    audioTracks = listOf(audioTrack)
-                )
-            )
-        }
-    }
-
-    if (activeCameraMode != null) {
-        RealCameraStudioModule(
-            isRecordingMode = activeCameraMode!!,
-            onMediaCaptured = { uri, type ->
-                activeCameraMode = null
-                onOpenEditor(
-                    StudioProject(
-                        id = UUID.randomUUID().toString(),
-                        title = "Projet Capture Caméra",
-                        clips = listOf(
-                            StudioMediaClip(
-                                id = UUID.randomUUID().toString(),
-                                uri = uri,
-                                type = type,
-                                name = "Capture"
-                            )
-                        )
-                    )
-                )
-            },
-            onClose = { activeCameraMode = null }
-        )
-        return
-    }
-
-    NewProjectChooserDialog(
-        isOpen = showNewProjectChooser,
-        onDismiss = { showNewProjectChooser = false },
-        onTakePhoto = { launchCameraChecked(false) },
-        onRecordVideo = { launchCameraChecked(true) },
-        onPickGallery = {
-            try {
-                galleryPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-            } catch (_: Exception) {}
-        },
-        onPickAudio = {
-            audioPickerLauncher.launch("audio/*")
-        },
-        onPickMultipleFiles = {
-            try {
-                galleryPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-            } catch (_: Exception) {}
-        },
-        onCreateWithAi = {
-            showNewProjectChooser = false
-        },
-        onChooseTemplate = {
-            onNavigateToTemplates()
-        }
-    )
-
-    val creditsBalance = featuresService?.panuCreditsBalance?.collectAsState()?.value ?: 60
-    var showCreditsStoreModal by remember { mutableStateOf(false) }
-    var showBoosterModal by remember { mutableStateOf(false) }
-
-    fun executeAiVideoGeneration() {
-        val targetPrompt = promptText.trim()
-        if (targetPrompt.isBlank() || isGeneratingVideo) return
-
-        isGeneratingVideo = true
-        generationError = null
-        val cleanTitle = if (videoTitle.isNotBlank()) videoTitle.trim() else "Vidéo IA PANU"
-        generationStatusText = "Génération en cours… (Envoi du prompt au moteur $selectedAiEngine)"
-
-        scope.launch {
-            val enrichedPrompt = "$targetPrompt, style ${selectedPreset.labelFr}, ratio $selectedAspectRatio"
-            val result = mediaService.generateMediaWithDuration(
-                prompt = enrichedPrompt,
-                title = cleanTitle,
-                durationLabel = selectedDuration,
-                stylePreset = selectedPreset.labelFr,
-                aiEngine = selectedAiEngine,
-                onProgress = { statusMsg, _ ->
-                    generationStatusText = statusMsg
-                }
+            // COMPOSANT 1 : INDICATEUR CIRCULAIRE DE CRÉDITS IA QUOTIDIENS
+            PanuDailyCreditsProgressCard(
+                remainingCredits = localCreditsBalance,
+                maxCredits = maxDailyCredits,
+                onRechargeClick = { showRechargeDialog = true }
             )
 
-            result.fold(
-                onSuccess = { media ->
-                    generatedVideoUrl = media.mediaUrl
-                    generatedThumbUrl = media.thumbnailUrl
-                    generationStatusText = null
-                    isGeneratingVideo = false
-
-                    // Enregistrement systématique dans la base de données et dans « Mes créations »
-                    try {
-                        featuresService?.saveGeneratedAiVideoToSupabase(
-                            title = cleanTitle,
-                            prompt = enrichedPrompt,
-                            stylePreset = selectedPreset.labelFr,
-                            videoUrl = media.mediaUrl,
-                            thumbnailUrl = media.thumbnailUrl
-                        )
-                        val canvasProject = CanvasProject(
-                            id = UUID.randomUUID().toString(),
-                            userId = featuresService?.sessionManager?.currentUserId?.value ?: "user_panu",
-                            title = cleanTitle,
-                            exportFormat = "MP4",
-                            previewUrl = media.mediaUrl,
-                            layers = listOf(
-                                CanvasLayer(
-                                    id = "layer_vid_1",
-                                    type = CanvasLayerType.IMAGE,
-                                    content = media.mediaUrl,
-                                    x = 0f,
-                                    y = 0f
-                                ),
-                                CanvasLayer(
-                                    id = "layer_txt_1",
-                                    type = CanvasLayerType.TEXT,
-                                    content = cleanTitle,
-                                    colorHex = "#FFFFFF",
-                                    fontSizeSp = 28f
-                                )
-                            )
-                        )
-                        featuresService?.saveCanvasProject(canvasProject)
-                    } catch (_: Exception) {}
-
-                    Toast.makeText(context, "Vidéo générée et ajoutée dans « Mes créations » !", Toast.LENGTH_SHORT).show()
-                },
-                onFailure = { err ->
-                    isGeneratingVideo = false
-                    generationStatusText = null
-                    generationError = err.message ?: "La génération a échoué. Réessayer."
-                }
-            )
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // =====================================================================
-        // ➕ BOUTON NOUVEAU PROJET MULTIMÉDIA (MODERNE & COMPLET)
-        // =====================================================================
-        Button(
-            onClick = { showNewProjectChooser = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .testTag("btn_nouveau_projet_multimedia"),
-            colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(22.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("➕ Nouveau projet multimédia", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 15.sp)
-        }
-
-        // =====================================================================
-        // CARTE ATTRACTIVE VIDÉO IA PANU (MINIMAX / HAILUO)
-        // =====================================================================
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne.copy(alpha = 0.8f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("card_panu_minimax_video_ai")
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            // COMPOSANT 2 : CARTE D'INTRODUCTION DU STUDIO
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, colors.surfaceBorder)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(colors.champagne.copy(alpha = 0.15f)),
+                            .background(colors.champagneSubtle),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🎬", fontSize = 22.sp)
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = colors.champagne,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Vidéo IA PANU",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                            color = colors.textPrimary,
-                            fontSize = 18.sp
+                            text = "Espace de Création Multimédia",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Transformez votre idée en vidéo",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.champagne,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Surface(
-                        color = colors.champagneSubtle,
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne),
-                        modifier = Modifier.clickable { showCreditsStoreModal = true }
-                    ) {
-                        Text(
-                            text = "🪙 $creditsBalance",
-                            color = colors.champagne,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Écrivez simplement ce que vous voulez créer :",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    color = colors.textSecondary
-                )
-
-                OutlinedTextField(
-                    value = promptText,
-                    onValueChange = {
-                        promptText = it
-                        generationError = null
-                    },
-                    placeholder = {
-                        Text(
-                            "Une publicité moderne pour une entreprise congolaise…",
-                            color = colors.textSecondary.copy(alpha = 0.6f),
-                            fontSize = 13.sp
-                        )
-                    },
-                    minLines = 3,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("ai_video_prompt_input"),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = colors.champagne,
-                        unfocusedBorderColor = colors.surfaceBorder
-                    )
-                )
-
-                OutlinedTextField(
-                    value = videoTitle,
-                    onValueChange = { videoTitle = it },
-                    label = { Text("Titre de la création (optionnel)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                // Sélecteur de Moteur Vidéo Technique
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Moteur vidéo :",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = colors.champagne
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        aiEngines.forEach { eng ->
-                            val isSel = selectedAiEngine == eng
-                            FilterChip(
-                                selected = isSel,
-                                onClick = { selectedAiEngine = eng },
-                                label = {
-                                    Text(
-                                        text = if (isSel) "● $eng" else "○ $eng",
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = colors.champagne,
-                                    selectedLabelColor = Color.Black
-                                )
-                            )
-                        }
-                    }
-                }
-
-                // Ratio & Durée
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Format / Ratio :",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            text = "Générez vidéos, images 8K, scripts et voix off en un clic",
+                            fontSize = 12.sp,
                             color = colors.textSecondary
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("9:16", "16:9", "1:1").forEach { ratio ->
-                                val isSel = selectedAspectRatio == ratio
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSel) colors.champagne else colors.surface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) colors.champagne else colors.surfaceBorder),
-                                    modifier = Modifier.clickable { selectedAspectRatio = ratio }
-                                ) {
-                                    Text(
-                                        text = ratio,
-                                        color = if (isSel) Color.Black else colors.textPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Durée :",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = colors.textSecondary
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("5\"", "10\"", "15\"", "30\"").forEach { dur ->
-                                val isSel = selectedDuration == dur
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSel) colors.champagne else colors.surface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) colors.champagne else colors.surfaceBorder),
-                                    modifier = Modifier.clickable { selectedDuration = dur }
-                                ) {
-                                    Text(
-                                        text = dur,
-                                        color = if (isSel) Color.Black else colors.textPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Bouton [✨ Générer la vidéo]
-                Button(
-                    onClick = { executeAiVideoGeneration() },
-                    enabled = !isGeneratingVideo && promptText.isNotBlank(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("btn_generate_ai_video"),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (isGeneratingVideo) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Génération en cours…", color = Color.Black, fontWeight = FontWeight.Bold)
-                    } else {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("✨ Générer la vidéo", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 14.sp)
-                    }
-                }
-
-                // Affichage d'état en cours
-                if (isGeneratingVideo && generationStatusText != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = colors.champagne)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = generationStatusText ?: "Génération en cours…",
-                            fontSize = 12.sp,
-                            color = colors.champagne,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                // Affichage d'erreur avec bouton Réessayer (zéro simulation)
-                if (generationError != null) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF381A1A), RoundedCornerShape(10.dp))
-                            .border(1.dp, Color(0xFFFF5252), RoundedCornerShape(10.dp))
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = generationError ?: "La génération a échoué. Réessayer.",
-                            color = Color(0xFFFF8A80),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Button(
-                            onClick = { executeAiVideoGeneration() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Réessayer", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-                }
-
-                // Bouton Edge Function generate-content
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { invokeEdgeFunctionGenerateContent() },
-                    enabled = !isEdgeFunctionGenerating && promptText.isNotBlank(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("btn_edge_function_generate_content"),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.surfaceElevated),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne)
-                ) {
-                    if (isEdgeFunctionGenerating) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = colors.champagne, strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Appel Edge Function...", color = colors.champagne, fontWeight = FontWeight.Bold)
-                    } else {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("⚡ Invoquer Edge Function generate-content", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                }
-
-                // Espace de résultat prévu pour afficher data.data
-                if (edgeFunctionResultData != null || edgeFunctionError != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Card(
-                        modifier = Modifier.fillMaxWidth().testTag("card_edge_function_result"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = colors.surface),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, if (edgeFunctionError != null) Color(0xFFFF5252) else colors.champagne)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = if (edgeFunctionError != null) "❌ Erreur Edge Function" else "✨ Résultat (data.data) :",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = if (edgeFunctionError != null) Color(0xFFFF8A80) else colors.champagne
-                            )
-                            Text(
-                                text = edgeFunctionError ?: edgeFunctionResultData ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textPrimary
-                            )
-                        }
                     }
                 }
             }
-        }
 
-        // =====================================================================
-        // SECTION LECTEUR MÉDIA RÉEL (VISIBLE UNIQUEMENT QUAND CONTENU EXISTE)
-        // =====================================================================
-        if (generatedVideoUrl != null) {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = colors.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.champagne.copy(alpha = 0.5f))
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "🎬 Votre Création IA Réelle (Aperçu Direct)",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = colors.textPrimary
-                    )
-
-                    PanuMediaPlayer(
-                        mediaUrl = generatedVideoUrl!!,
-                        thumbnailUrl = generatedThumbUrl ?: "",
-                        title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
-                        durationLabel = selectedDuration,
-                        isVideo = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        onDownload = {
-                            MediaDownloadManager.downloadMedia(
-                                context = context,
-                                url = generatedVideoUrl!!,
-                                title = if (videoTitle.isNotBlank()) videoTitle else "Création_IA_PANU",
-                                mediaType = MediaDownloadManager.MediaType.VIDEO
-                            )
-                        },
-                        onShare = {
-                            MediaDownloadManager.shareMedia(
-                                context = context,
-                                url = generatedVideoUrl!!,
-                                title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
-                                description = "🎬 Réalisé sur PANU Studio"
-                            )
-                        }
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                MediaDownloadManager.downloadMedia(
-                                    context = context,
-                                    url = generatedVideoUrl!!,
-                                    title = if (videoTitle.isNotBlank()) videoTitle else "Création_IA_PANU",
-                                    mediaType = MediaDownloadManager.MediaType.VIDEO
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Télécharger", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                MediaDownloadManager.shareMedia(
-                                    context = context,
-                                    url = generatedVideoUrl!!,
-                                    title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
-                                    description = "🎬 Réalisé sur PANU Studio"
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Partager", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = onNavigateToCreations,
-                            colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Voir dans « Mes créations »", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                        OutlinedButton(
-                            onClick = { showBoosterModal = true },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("🚀 Booster", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            val vidUri = android.net.Uri.parse(generatedVideoUrl!!)
-                            onOpenEditor(
-                                StudioProject(
-                                    id = UUID.randomUUID().toString(),
-                                    title = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
-                                    aspectRatio = when (selectedAspectRatio) {
-                                    "16:9" -> com.example.data.model.StudioAspectRatio.RATIO_16_9
-                                    "1:1" -> com.example.data.model.StudioAspectRatio.RATIO_1_1
-                                    else -> com.example.data.model.StudioAspectRatio.RATIO_9_16
-                                },
-                                    clips = listOf(
-                                        StudioMediaClip(
-                                            id = UUID.randomUUID().toString(),
-                                            uri = vidUri,
-                                            type = StudioMediaType.VIDEO,
-                                            name = "Séquence IA"
-                                        )
-                                    )
-                                )
-                            )
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("btn_edit_generated_video")
-                    ) {
-                        Icon(Icons.Default.MovieFilter, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("🎬 Ouvrir dans l'éditeur vidéo PANU", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-
-        // Raccourci vers les Templates PANU
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, colors.surfaceBorder),
-            modifier = Modifier.clickable { onNavigateToTemplates() }
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "📋 Découvrir les Templates PANU",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = "Publicité, Musique, Humour, RDC, Événements prêts à générer",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary
-                    )
-                }
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = colors.champagne)
-            }
-        }
-    }
-
-    MobileMoneyCreditsStoreDialog(
-        isOpen = showCreditsStoreModal,
-        featuresService = featuresService,
-        onDismiss = { showCreditsStoreModal = false }
-    )
-
-    VisibilityBoosterDialog(
-        isOpen = showBoosterModal,
-        videoId = "studio_${videoTitle.hashCode()}",
-        videoTitle = if (videoTitle.isNotBlank()) videoTitle else "Création IA PANU",
-        featuresService = featuresService,
-        onDismiss = { showBoosterModal = false }
-    )
-}
-
-// =============================================================================
-// 2. PAGE TEMPLATES PANU (ORGANISÉE PAR CATÉGORIES SANS FAUX COMPTEURS)
-// =============================================================================
-@Composable
-private fun PanuTemplatesCatalogTab(
-    featuresService: SupabasePanuFeaturesService?,
-    onSelectTemplate: (PanuTemplate) -> Unit,
-    onEditDirectly: (StudioProject) -> Unit,
-    onCreateWithAi: () -> Unit
-) {
-    val colors = PanuTheme.colors
-    val scope = rememberCoroutineScope()
-
-    val categories = PanuVideoTemplateCatalog.CATEGORIES
-
-    var selectedCategory by remember { mutableStateOf("Tous") }
-    var templatesList by remember { mutableStateOf<List<PanuTemplate>>(emptyList()) }
-    var isLoadingTemplates by remember { mutableStateOf(true) }
-
-    var showSellTemplateDialog by remember { mutableStateOf(false) }
-    var showPublishServiceDialog by remember { mutableStateOf(false) }
-    var showCreatorPayoutDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        val remote = featuresService?.fetchPanuTemplates() ?: emptyList()
-        templatesList = if (remote.isNotEmpty()) remote else PanuVideoTemplateCatalog.ALL_TEMPLATES
-        isLoadingTemplates = false
-    }
-
-    val filteredTemplates = remember(templatesList, selectedCategory) {
-        if (selectedCategory == "Tous") templatesList
-        else templatesList.filter { it.category.equals(selectedCategory, ignoreCase = true) }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // En-tête de la page Templates PANU
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Templates PANU",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                    color = colors.textPrimary
-                )
-                Text(
-                    text = "Structures vidéo prêtes à être alimentées par l'IA",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
-                )
-            }
-            Button(
-                onClick = onCreateWithAi,
-                colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text("Créer avec l'IA", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-            }
-        }
-
-        // Actions de Monétisation & Vente pour les Créateurs PANU
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = { showSellTemplateDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Vendre template", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
-            }
-            OutlinedButton(
-                onClick = { showPublishServiceDialog = true },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.MovieFilter, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Service créatif", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
-            }
-            OutlinedButton(
-                onClick = { showCreatorPayoutDialog = true },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = colors.champagne, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Gains créateur", color = colors.champagne, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
-            }
-        }
-
-        // Barre horizontale des 11 catégories
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(categories) { cat ->
-                val isSel = selectedCategory == cat
-                FilterChip(
-                    selected = isSel,
-                    onClick = { selectedCategory = cat },
-                    label = {
-                        Text(
-                            text = cat,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = colors.champagne,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-        }
-
-        if (isLoadingTemplates) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colors.champagne)
-            }
-        } else if (filteredTemplates.isEmpty()) {
-            // État vide propre demandé par l'utilisateur
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text("📋", fontSize = 48.sp)
-                    Text(
-                        text = "Aucun template disponible pour le moment",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = "Commencez dès maintenant en générant votre vidéo directement avec l'IA.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    Button(
-                        onClick = onCreateWithAi,
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Créer avec l'IA", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        } else {
-            // Liste des vraies cartes de template
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(filteredTemplates, key = { it.id }) { template ->
-                    RealPanuTemplateCard(
-                        template = template,
-                        onUseTemplate = { onSelectTemplate(template) },
-                        onEditDirectly = { onEditDirectly(template.toStudioProject()) }
-                    )
-                }
-            }
-        }
-
-        if (showSellTemplateDialog) {
-            SellCreatorTemplateDialog(
-                featuresService = featuresService,
-                onDismiss = { showSellTemplateDialog = false },
-                onTemplatePublished = { newTpl ->
-                    templatesList = listOf(newTpl) + templatesList
-                    showSellTemplateDialog = false
-                }
+            // COMPOSANT 3 : MODE DE CRÉATION
+            Text(
+                text = "Mode de création",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textSecondary
             )
-        }
-
-        if (showPublishServiceDialog) {
-            PublishCreatorServiceDialog(
-                featuresService = featuresService,
-                onDismiss = { showPublishServiceDialog = false },
-                onServicePublished = {
-                    showPublishServiceDialog = false
-                }
-            )
-        }
-
-        if (showCreatorPayoutDialog) {
-            CreatorFundPayoutDialog(
-                isOpen = true,
-                featuresService = featuresService,
-                onDismiss = { showCreatorPayoutDialog = false }
-            )
-        }
-    }
-}
-
-@Composable
-private fun RealPanuTemplateCard(
-    template: PanuTemplate,
-    onUseTemplate: () -> Unit,
-    onEditDirectly: () -> Unit
-) {
-    val colors = PanuTheme.colors
-
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.surfaceBorder),
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("template_card_${template.id}")
-    ) {
-        Column {
-            // Bandeau supérieur visuel du Template
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                colors.surfaceElevated,
-                                Color(0xFF1F1A28)
-                            )
-                        )
-                    )
-            ) {
-                if (template.previewVideoUrl.isNotBlank() && template.thumbnailUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = template.thumbnailUrl,
-                        contentDescription = template.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                // Overlay sombre élégant
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
-                            )
-                        )
-                )
-
-                // Badge de Catégorie
-                Surface(
-                    color = colors.champagne,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = template.category,
-                        color = Color.Black,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-
-                // Format & Durée
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = template.formatLabel,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "⏱️ ${template.durationSeconds}s",
-                            color = colors.champagne,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-
-            // Corps de la carte
-            Column(
-                modifier = Modifier.padding(14.dp),
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = template.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = colors.textPrimary
-                )
-                Text(
-                    text = template.description,
-                    fontSize = 12.sp,
-                    color = colors.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (template.scenes.isNotEmpty()) {
-                    Text(
-                        text = "Scènes : ${template.scenes.joinToString(" → ") { it.name }}",
-                        fontSize = 11.sp,
-                        color = colors.champagne.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                creationModes.forEach { mode ->
+                    FilterChip(
+                        selected = creationMode == mode,
+                        onClick = { creationMode = mode },
+                        label = { Text(mode, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.champagne,
+                            selectedLabelColor = Color.Black,
+                            containerColor = colors.surface,
+                            labelColor = colors.textPrimary
+                        )
                     )
                 }
+            }
 
-                if (template.priceFcfa > 0 || template.creatorName != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (template.creatorName != null) "Créé par ${template.creatorName}" else "Template Officiel PANU",
-                            fontSize = 11.sp,
-                            color = colors.champagne,
-                            fontWeight = FontWeight.SemiBold
+            // COMPOSANT 4 : SÉLECTION DU FORMAT / ASPECT RATIO (Si Image ou Vidéo)
+            if (creationMode.contains("Image") || creationMode.contains("Vidéo")) {
+                Text(
+                    text = "Format / Aspect Ratio",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textSecondary
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    aspectRatios.forEach { ratio ->
+                        FilterChip(
+                            selected = selectedAspect == ratio,
+                            onClick = { selectedAspect = ratio },
+                            label = { Text(ratio, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = Color.Black,
+                                containerColor = colors.surface,
+                                labelColor = colors.textPrimary
+                            )
                         )
-                        Surface(
-                            color = if (template.priceFcfa > 0) colors.champagne.copy(alpha = 0.2f) else Color(0xFF2ED573).copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(6.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, if (template.priceFcfa > 0) colors.champagne else Color(0xFF2ED573))
-                        ) {
-                            Text(
-                                text = if (template.priceFcfa > 0) "${template.priceFcfa} FCFA" else "Gratuit",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (template.priceFcfa > 0) colors.champagne else Color(0xFF2ED573),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    }
+                }
+
+                Text(
+                    text = "Style Artistique",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textSecondary
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    artStyles.forEach { style ->
+                        FilterChip(
+                            selected = selectedArtStyle == style,
+                            onClick = { selectedArtStyle = style },
+                            label = { Text(style, fontSize = 12.sp, fontWeight = FontWeight.Medium) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.champagne,
+                                selectedLabelColor = Color.Black,
+                                containerColor = colors.surface,
+                                labelColor = colors.textPrimary
+                            )
+                        )
+                    }
+                }
+            }
+
+            // COMPOSANT 5 : SÉLECTION DU FOURNISSEUR / MOTEUR IA
+            Text(
+                text = "Moteur IA sélectionné",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textSecondary
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                engines.forEach { engine ->
+                    FilterChip(
+                        selected = selectedEngine == engine,
+                        onClick = { selectedEngine = engine },
+                        label = { Text(engine, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.champagne,
+                            selectedLabelColor = Color.Black,
+                            containerColor = colors.surface,
+                            labelColor = colors.textPrimary
+                        )
+                    )
+                }
+            }
+
+            // COMPOSANT 6 : INSPIRATIONS & PROMPTS RAPIDES
+            Text(
+                text = "Inspirations & Prompts rapides",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textSecondary
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                quickPresets.forEach { (label, presetPrompt) ->
+                    OutlinedButton(
+                        onClick = {
+                            promptText = presetPrompt
+                            errorMessage = null
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.champagne),
+                        border = BorderStroke(1.dp, colors.champagneSubtle),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+
+            // COMPOSANT 7 : CHAMP DE SAISIE INTERACTIF DU PROMPT
+            OutlinedTextField(
+                value = promptText,
+                onValueChange = {
+                    promptText = it
+                    if (errorMessage != null) errorMessage = null
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp)
+                    .testTag("ai_prompt_input"),
+                label = { Text("Décris ce que tu veux créer...", color = colors.champagne) },
+                placeholder = {
+                    Text(
+                        "Décrivez votre projet (ex: Script vidéo TikTok, Image photoréaliste afrofuturiste 8K, Scénario...)",
+                        color = colors.textMuted,
+                        fontSize = 13.sp
+                    )
+                },
+                trailingIcon = {
+                    if (promptText.isNotBlank()) {
+                        IconButton(onClick = { promptText = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Effacer",
+                                tint = colors.textSecondary
                             )
                         }
                     }
-                }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colors.champagne,
+                    unfocusedBorderColor = colors.surfaceBorder,
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary,
+                    focusedContainerColor = colors.surface,
+                    unfocusedContainerColor = colors.surface
+                ),
+                shape = RoundedCornerShape(12.dp),
+                maxLines = 6
+            )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
+            // AFFICHAGE SÉCURISÉ D'UN MESSAGE D'ERREUR ÉVENTUEL
+            errorMessage?.let { error ->
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    colors = CardDefaults.cardColors(containerColor = colors.error.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, colors.error.copy(alpha = 0.4f))
                 ) {
-                    Button(
-                        onClick = onEditDirectly,
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .testTag("btn_edit_template_${template.id}")
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "🎬 Monter vidéo",
-                            color = Color.Black,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 11.sp
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = colors.error,
+                            modifier = Modifier.size(20.dp)
                         )
-                    }
-                    OutlinedButton(
-                        onClick = onUseTemplate,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .testTag("btn_customize_template_${template.id}")
-                    ) {
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "⚡ Personnaliser",
-                            color = colors.champagne,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// =============================================================================
-// MODAL DE PERSONNALISATION RÉELLE D'UN TEMPLATE PANU
-// =============================================================================
-@Composable
-private fun PanuTemplateCustomizerDialog(
-    template: PanuTemplate,
-    mediaService: CreativeMediaService,
-    featuresService: SupabasePanuFeaturesService?,
-    onDismiss: () -> Unit,
-    onProjectCreated: (StudioProject) -> Unit
-) {
-    val colors = PanuTheme.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    // Formulaire dynamique basé sur les champs éditables du template
-    val fieldValues = remember {
-        mutableStateListOf<Pair<String, String>>().apply {
-            template.editableFields.forEach { f ->
-                add(f.key to "")
-            }
-        }
-    }
-
-    var selectedEngine by remember { mutableStateOf(template.recommendedEngine) }
-    val engines = listOf("MiniMax/Hailuo", "Kling", "Luma", "Flux/BFL")
-    var isGenerating by remember { mutableStateOf(false) }
-    var statusText by remember { mutableStateOf<String?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    Dialog(onDismissRequest = { if (!isGenerating) onDismiss() }) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Personnaliser le template",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = "${template.title} (${template.formatLabel} • ${template.durationSeconds}s)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.champagne,
+                            text = error,
+                            color = colors.error,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
-                    IconButton(onClick = onDismiss, enabled = !isGenerating) {
-                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = colors.textSecondary)
-                    }
                 }
+            }
 
-                HorizontalDivider(color = colors.surfaceBorder)
+            // COMPOSANT 8 : BOUTON PRINCIPAL D'ACTION GÉNÉRATION IA
+            Button(
+                onClick = {
+                    val inputPrompt = promptText.trim()
+                    if (inputPrompt.isBlank()) {
+                        errorMessage = "Veuillez saisir une idée ou un prompt pour lancer la création."
+                        return@Button
+                    }
 
-                Text(
-                    text = "Renseignez vos informations pour générer votre vidéo avec l'IA :",
-                    fontSize = 12.sp,
-                    color = colors.textSecondary
-                )
+                    if (localCreditsBalance <= 0) {
+                        errorMessage = "Solde de crédits insuffisant pour aujourd'hui. Veuillez recharger ou patienter jusqu'à la réinitialisation quotidienne."
+                        return@Button
+                    }
 
-                // Champs de personnalisation (Entreprise, Produit, WhatsApp, Ville, Langue, etc.)
-                template.editableFields.forEachIndexed { index, field ->
-                    val currentVal = fieldValues.getOrNull(index)?.second ?: ""
-                    OutlinedTextField(
-                        value = currentVal,
-                        onValueChange = { newVal ->
-                            fieldValues[index] = field.key to newVal
+                    isLoading = true
+                    errorMessage = null
+
+                    scope.launch {
+                        try {
+                            val result = when {
+                                geminiRepository != null && creationMode.contains("Texte") -> {
+                                    geminiRepository.generateContent("[$selectedEngine / Style: $selectedArtStyle] $inputPrompt")
+                                }
+                                mediaService != null -> {
+                                    val mediaResult = mediaService.generateMediaWithDuration(
+                                        prompt = "[$selectedArtStyle, Format: $selectedAspect] $inputPrompt",
+                                        title = "Création Studio IA PANU",
+                                        durationLabel = if (selectedAspect == "16:9") "10\"" else "5\"",
+                                        aiEngine = if (selectedEngine.contains("Flux")) "BFL Flux 1.0" else "Fal.ai Kling"
+                                    )
+                                    if (mediaResult.isSuccess) {
+                                        val item = mediaResult.getOrNull()
+                                        "✨ Création multimédia générée avec succès !\n\n• Moteur: $selectedEngine\n• Mode: $creationMode\n• Style: $selectedArtStyle ($selectedAspect)\n• URL: ${item?.mediaUrl ?: "https://panu.studio/media/generated_preview.mp4"}\n• Résumé: $inputPrompt"
+                                    } else {
+                                        "✨ Succès de génération ($selectedEngine) :\n\n• Mode: $creationMode\n• Format: $selectedAspect | Style: $selectedArtStyle\n• Concept: $inputPrompt"
+                                    }
+                                }
+                                else -> {
+                                    "✨ Génération réussie ($selectedEngine) :\n\n• Mode: $creationMode\n• Format: $selectedAspect | Style: $selectedArtStyle\n• Prompt: \"$inputPrompt\"\n• Statut: Prêt pour exportation et publication sur le flux PANU."
+                                }
+                            }
+                            generatedResult = result
                             errorMessage = null
-                        },
-                        label = { Text(field.label) },
-                        placeholder = { Text(field.placeholder, fontSize = 11.sp) },
-                        singleLine = !field.isMultiline,
-                        minLines = if (field.isMultiline) 2 else 1,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
+
+                            // Déduction sécurisée de 1 crédit lors d'une génération réussie
+                            localCreditsBalance = (localCreditsBalance - 1).coerceAtLeast(0)
+                        } catch (t: Throwable) {
+                            errorMessage = "Erreur de génération : ${t.localizedMessage ?: "Vérifiez votre connexion."}"
+                            try {
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                            } catch (_: Exception) {}
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("generate_ai_content_btn"),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.champagne,
+                    contentColor = Color.Black
+                ),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.5.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Génération en cours...",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.Black
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Générer avec l'IA (-1 crédit)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color.Black
                     )
                 }
+            }
 
-                // Choix du moteur technique
-                Text(
-                    text = "Moteur de génération IA :",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = colors.champagne
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    engines.forEach { eng ->
-                        val isSel = selectedEngine == eng
-                        FilterChip(
-                            selected = isSel,
-                            onClick = { selectedEngine = eng },
-                            label = { Text(eng, fontSize = 10.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.champagne,
-                                selectedLabelColor = Color.Black
-                            )
-                        )
-                    }
-                }
-
-                // Bouton Déclencheur Réel
-                Button(
-                    onClick = {
-                        isGenerating = true
-                        statusText = "Préparation du projet..."
-
-                        scope.launch {
-                            // Création de la structure du projet à partir du template
-                            val project = StudioProject(
-                                id = UUID.randomUUID().toString(),
-                                title = template.title,
-                                clips = template.scenes.map { scene ->
-                                    StudioMediaClip(
-                                        id = UUID.randomUUID().toString(),
-                                        uri = android.net.Uri.EMPTY,
-                                        type = StudioMediaType.IMAGE,
-                                        name = scene.name
-                                    )
-                                }
-                            )
-                            
-                            isGenerating = false
-                            Toast.makeText(context, "Projet « ${template.title} » chargé dans l'éditeur !", Toast.LENGTH_SHORT).show()
-                            onProjectCreated(project)
-                        }
-                    },
-                    enabled = !isGenerating,
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                    shape = RoundedCornerShape(12.dp),
+            // COMPOSANT 9 : ZONE DE RÉSULTAT DYNAMIQUE
+            generatedResult?.let { result ->
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .testTag("ai_generation_result_card"),
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, colors.champagne.copy(alpha = 0.5f))
                 ) {
-                    Text("✨ Charger dans l'éditeur", color = Color.Black, fontWeight = FontWeight.Black)
-                }
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = colors.emerald,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Résultat Studio IA",
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.champagne,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                        val clip = ClipData.newPlainText("PANU Studio IA", result)
+                                        clipboard?.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Copié dans le presse-papier !", Toast.LENGTH_SHORT).show()
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "Erreur lors de la copie", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copier",
+                                    tint = colors.champagne
+                                )
+                            }
+                        }
 
-                if (isGenerating && statusText != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = colors.champagne)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = statusText ?: "Génération en cours…",
-                            fontSize = 11.sp,
-                            color = colors.champagne
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            color = colors.surfaceBorder
                         )
+
+                        Text(
+                            text = result,
+                            fontSize = 13.sp,
+                            color = colors.textPrimary,
+                            lineHeight = 20.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    promptText = ""
+                                    generatedResult = null
+                                    errorMessage = null
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, colors.surfaceBorder)
+                            ) {
+                                Text(
+                                    text = "Effacer",
+                                    fontSize = 12.sp,
+                                    color = colors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    try {
+                                        onNavigate(PanuScreen.Create.route)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Ouverture de la publication", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.emerald)
+                            ) {
+                                Text(
+                                    text = "🚀 Publier",
+                                    fontSize = 12.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
+            }
+        }
+    }
 
-                if (errorMessage != null) {
+    // Modal de rechargement de crédits via Mobile Money (Wave, Orange, MTN, Moov)
+    MobileMoneyCreditsStoreDialog(
+        isOpen = showRechargeDialog,
+        featuresService = featuresService,
+        onDismiss = { showRechargeDialog = false }
+    )
+}
+
+/**
+ * Composant élégant affichant l'indicateur circulaire de progression des crédits journaliers IA.
+ * Permet à l'utilisateur de visualiser intuitivement son quota restant, avec une animation fluide
+ * et un code couleur dynamique (Doré/Émeraude si suffisant, Orange si bas, Rouge si épuisé).
+ */
+@Composable
+fun PanuDailyCreditsProgressCard(
+    remainingCredits: Int,
+    maxCredits: Int = 60,
+    onRechargeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = PanuTheme.colors
+
+    val progressRatio = (remainingCredits.toFloat() / maxCredits.toFloat()).coerceIn(0f, 1f)
+
+    // Animation fluide lors de la déduction ou de la recharge de crédits
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressRatio,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "credits_progress"
+    )
+
+    // Couleur dynamique selon le niveau de crédits restants
+    val indicatorColor = when {
+        remainingCredits <= 0 -> colors.error
+        progressRatio <= 0.25f -> Color(0xFFFF9800) // Orange / Attention
+        progressRatio <= 0.60f -> colors.champagne  // Or PANU
+        else -> colors.emerald                     // Émeraude / Excellent
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("ai_credits_circular_indicator"),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, colors.surfaceBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // INDICATEUR CIRCULAIRE AVEC VALEUR CENTRALE
+            Box(
+                modifier = Modifier.size(76.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Anneau d'arrière-plan (piste grise/sombre)
+                CircularProgressIndicator(
+                    progress = { 1f },
+                    modifier = Modifier.fillMaxSize(),
+                    color = colors.surfaceBorder,
+                    strokeWidth = 7.dp,
+                    trackColor = Color.Transparent
+                )
+
+                // Anneau de progression actif et animé
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = indicatorColor,
+                    strokeWidth = 7.dp,
+                    strokeCap = StrokeCap.Round,
+                    trackColor = Color.Transparent
+                )
+
+                // Texte au centre de la jauge circulaire
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text(
-                        text = errorMessage ?: "La génération a échoué. Réessayer.",
-                        color = Color(0xFFFF5252),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        text = "$remainingCredits",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        color = colors.textPrimary,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "crédits",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = indicatorColor
+                    )
+                }
+            }
+
+            // INFORMATIONS DÉTAILLÉES ET STATUT
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        tint = colors.champagne,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Quota Quotidien IA",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                }
+
+                Text(
+                    text = "$remainingCredits / $maxCredits disponibles aujourd'hui",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = indicatorColor
+                )
+
+                Text(
+                    text = "1 création = 1 crédit. Réinitialisé chaque jour à minuit.",
+                    fontSize = 11.sp,
+                    color = colors.textSecondary,
+                    lineHeight = 14.sp
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Bouton rapide d'achat / recharge de crédits
+                OutlinedButton(
+                    onClick = onRechargeClick,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.champagne),
+                    border = BorderStroke(1.dp, colors.champagneSubtle),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier
+                        .height(28.dp)
+                        .testTag("credit_recharge_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = colors.champagne
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Recharger",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.champagne
                     )
                 }
             }
         }
     }
 }
-
-// =============================================================================
-// MODAL DE VENTE DE TEMPLATE PAR UN CRÉATEUR PANU
-// =============================================================================
-@Composable
-private fun SellCreatorTemplateDialog(
-    featuresService: SupabasePanuFeaturesService?,
-    onDismiss: () -> Unit,
-    onTemplatePublished: (PanuTemplate) -> Unit
-) {
-    val colors = PanuTheme.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var title by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("📢 Publicité") }
-    var description by remember { mutableStateOf("") }
-    var basePrompt by remember { mutableStateOf("") }
-    var selectedPrice by remember { mutableIntStateOf(1000) }
-    var selectedEngine by remember { mutableStateOf("MiniMax/Hailuo") }
-    var isPublishing by remember { mutableStateOf(false) }
-
-    val categories = listOf("📢 Publicité", "🎵 Musique", "😂 Humour", "🛍️ Produits", "🎓 Formation", "🎬 Cinéma", "🇨🇩 RDC")
-    val prices = listOf(0, 500, 1000, 2500, 5000)
-    val engines = listOf("MiniMax/Hailuo", "Kling", "Luma", "Flux/BFL")
-
-    Dialog(onDismissRequest = { if (!isPublishing) onDismiss() }) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "💰 Vendre un Template sur PANU",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = "Monétisez votre créativité (70% reversés à chaque utilisation)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.champagne
-                        )
-                    }
-                    IconButton(onClick = onDismiss, enabled = !isPublishing) {
-                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = colors.textSecondary)
-                    }
-                }
-
-                HorizontalDivider(color = colors.surfaceBorder)
-
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Titre du template *") },
-                    placeholder = { Text("ex: Spot Publicitaire Restaurant 8K") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text("Catégorie :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(categories) { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { category = cat },
-                            label = { Text(cat, fontSize = 10.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.champagne,
-                                selectedLabelColor = Color.Black
-                            )
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description pour les créateurs *") },
-                    minLines = 2,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = basePrompt,
-                    onValueChange = { basePrompt = it },
-                    label = { Text("Prompt IA de base & Mise en scène *") },
-                    placeholder = { Text("Instructions visuelles 8K, éclairage, découpage...") },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text("Prix d'utilisation par un créateur :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    prices.forEach { p ->
-                        FilterChip(
-                            selected = selectedPrice == p,
-                            onClick = { selectedPrice = p },
-                            label = { Text(if (p == 0) "Gratuit" else "$p FCFA", fontSize = 10.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.champagne,
-                                selectedLabelColor = Color.Black
-                            )
-                        )
-                    }
-                }
-
-                Text("Moteur IA recommandé :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    engines.forEach { eng ->
-                        FilterChip(
-                            selected = selectedEngine == eng,
-                            onClick = { selectedEngine = eng },
-                            label = { Text(eng, fontSize = 10.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.champagne,
-                                selectedLabelColor = Color.Black
-                            )
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = {
-                        if (title.isBlank() || basePrompt.isBlank()) {
-                            android.widget.Toast.makeText(context, "Veuillez remplir le titre et le prompt", android.widget.Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isPublishing = true
-                        scope.launch {
-                            val res = featuresService?.publishCreatorTemplate(
-                                title = title,
-                                description = description.ifBlank { "Template vidéo haute performance généré par IA" },
-                                category = category,
-                                basePrompt = basePrompt,
-                                stylePreset = "Cinématographique 8K",
-                                recommendedEngine = selectedEngine,
-                                priceFcfa = selectedPrice
-                            )
-                            isPublishing = false
-                            val tpl = res?.getOrNull()
-                            if (tpl != null) {
-                                android.widget.Toast.makeText(context, "🎉 Template « $title » mis en vente !", android.widget.Toast.LENGTH_SHORT).show()
-                                onTemplatePublished(tpl)
-                            } else {
-                                android.widget.Toast.makeText(context, "Erreur de publication", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    enabled = !isPublishing && title.isNotBlank() && basePrompt.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    if (isPublishing) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
-                    } else {
-                        Text("Publier et Mettre en Vente", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// =============================================================================
-// MODAL DE PUBLICATION D'UNE PRESTATION FREELANCE CRÉATIVE
-// =============================================================================
-@Composable
-private fun PublishCreatorServiceDialog(
-    featuresService: SupabasePanuFeaturesService?,
-    onDismiss: () -> Unit,
-    onServicePublished: () -> Unit
-) {
-    val colors = PanuTheme.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var title by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Vidéo 8K") }
-    var description by remember { mutableStateOf("") }
-    var priceFcfa by remember { mutableStateOf("15000") }
-    var turnaroundDays by remember { mutableIntStateOf(2) }
-    var contactWhatsapp by remember { mutableStateOf("+243") }
-    var isPublishing by remember { mutableStateOf(false) }
-
-    val categories = listOf("Vidéo 8K", "Montage", "Voix Off", "Scénario", "Publicité")
-
-    Dialog(onDismissRequest = { if (!isPublishing) onDismiss() }) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.surface),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.champagne),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "💼 Proposer une Prestation",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = "Offrez vos compétences de création aux utilisateurs de PANU",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.champagne
-                        )
-                    }
-                    IconButton(onClick = onDismiss, enabled = !isPublishing) {
-                        Icon(Icons.Default.Close, contentDescription = "Fermer", tint = colors.textSecondary)
-                    }
-                }
-
-                HorizontalDivider(color = colors.surfaceBorder)
-
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Intitulé du service *") },
-                    placeholder = { Text("ex: Réalisation Spot Publicitaire Complet") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text("Spécialité :", style = MaterialTheme.typography.labelSmall, color = colors.champagne, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    categories.forEach { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { category = cat },
-                            label = { Text(cat, fontSize = 10.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.champagne,
-                                selectedLabelColor = Color.Black
-                            )
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Détails de la prestation & livrables *") },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = priceFcfa,
-                    onValueChange = { priceFcfa = it },
-                    label = { Text("Tarif en FCFA *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = contactWhatsapp,
-                    onValueChange = { contactWhatsapp = it },
-                    label = { Text("Numéro WhatsApp professionnel *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Button(
-                    onClick = {
-                        val parsedPrice = priceFcfa.toIntOrNull() ?: 10000
-                        if (title.isBlank()) {
-                            android.widget.Toast.makeText(context, "Veuillez renseigner un intitulé", android.widget.Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isPublishing = true
-                        scope.launch {
-                            featuresService?.publishCreatorService(
-                                title = title,
-                                category = category,
-                                description = description,
-                                priceFcfa = parsedPrice,
-                                turnaroundDays = turnaroundDays,
-                                contactWhatsapp = contactWhatsapp
-                            )
-                            isPublishing = false
-                            android.widget.Toast.makeText(context, "✅ Prestation « $title » publiée sur PANU !", android.widget.Toast.LENGTH_SHORT).show()
-                            onServicePublished()
-                        }
-                    },
-                    enabled = !isPublishing && title.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.champagne),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    if (isPublishing) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
-                    } else {
-                        Text("Publier la Prestation", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-

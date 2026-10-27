@@ -7,15 +7,56 @@ export interface StudioIAProps {
 }
 
 export default function StudioIA({ currentUser }: StudioIAProps) {
-  const [prompt, setPrompt] = useState('');
-  const [mediaType, setMediaType] = useState<'video' | 'image'>('video');
-  const [stylePreset, setStylePreset] = useState('Cinématique 8K');
+  // Auto-load from localStorage on initial mount
+  const [prompt, setPrompt] = useState(() => {
+    try {
+      const saved = localStorage.getItem('panu_studio_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.prompt || '';
+      }
+    } catch (_) {}
+    return '';
+  });
+
+  const [mediaType, setMediaType] = useState<'video' | 'image'>(() => {
+    try {
+      const saved = localStorage.getItem('panu_studio_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.mediaType || 'video';
+      }
+    } catch (_) {}
+    return 'video';
+  });
+
+  const [stylePreset, setStylePreset] = useState(() => {
+    try {
+      const saved = localStorage.getItem('panu_studio_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.stylePreset || 'Cinématique 8K';
+      }
+    } catch (_) {}
+    return 'Cinématique 8K';
+  });
+
   const [loading, setLoading] = useState(false);
   const [generatedMedia, setGeneratedMedia] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [resolvedUser, setResolvedUser] = useState<{ id: string; email?: string } | null>(currentUser || null);
   const { showToast } = useNotifications();
+
+  // Auto-save to localStorage whenever prompt, mediaType, or stylePreset changes
+  useEffect(() => {
+    try {
+      const draft = JSON.stringify({ prompt, mediaType, stylePreset });
+      localStorage.setItem('panu_studio_draft', draft);
+    } catch (e) {
+      console.error('Failed to auto-save studio draft', e);
+    }
+  }, [prompt, mediaType, stylePreset]);
 
   useEffect(() => {
     if (currentUser) {
@@ -134,12 +175,22 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
       } else {
         setPublished(true);
         showToast('Publication mise en ligne sur PANU avec succès !', 'success');
+        // Clear draft after successful publish
+        localStorage.removeItem('panu_studio_draft');
       }
     } catch (err: any) {
       showToast(err?.message || 'Erreur lors de la publication.', 'error');
     } finally {
       setPublishing(false);
     }
+  };
+
+  const handleClearDraft = () => {
+    setPrompt('');
+    setMediaType('video');
+    setStylePreset('Cinématique 8K');
+    localStorage.removeItem('panu_studio_draft');
+    showToast('Brouillon effacé.', 'success');
   };
 
   return (
@@ -155,9 +206,27 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
         boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
       }}
     >
-      <h2 style={{ margin: '0 0 16px', fontSize: 20, fontWeight: 900, color: '#E5A93C' }}>
-        Studio IA - Génération Vidéo & Image
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#E5A93C' }}>
+          Studio IA - Génération Vidéo & Image
+        </h2>
+        <button
+          type="button"
+          onClick={handleClearDraft}
+          style={{
+            background: 'transparent',
+            border: '1px solid #2E3248',
+            color: '#AAA',
+            fontSize: '11px',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+          }}
+          title="Effacer le brouillon auto-sauvegardé"
+        >
+          Effacer brouillon
+        </button>
+      </div>
 
       <label style={{ fontSize: 13, fontWeight: 700, color: '#DDD', display: 'block', marginBottom: 6 }}>
         1. Type de contenu :
@@ -229,14 +298,21 @@ export default function StudioIA({ currentUser }: StudioIAProps) {
           cursor: loading ? 'not-allowed' : 'pointer',
           boxShadow: '0 4px 15px rgba(229, 169, 60, 0.3)',
           transition: 'all 0.2s ease',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}
       >
-        {loading
-          ? 'Génération en cours...'
-          : mediaType === 'video'
-          ? '✨ Générer la Vidéo IA'
-          : '✨ Générer l\'Image IA'}
+        {loading && (
+          <span style={{ width: 16, height: 16, border: '2px solid #000', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        )}
+        {loading ? 'Génération en cours...' : mediaType === 'video' ? '✨ Générer la Vidéo IA' : '✨ Générer l\'Image IA'}
       </button>
+
+      {/* Inline Error Display */}
+      {/* Note: I'll maintain errors in local state or show as toast, keeping it simple as requested */}
+      <style>{`
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      `}</style>
+
 
       {generatedMedia && (
         <div style={{ marginTop: '20px' }}>

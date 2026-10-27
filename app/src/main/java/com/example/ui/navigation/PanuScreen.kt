@@ -27,4 +27,5 @@ sealed class PanuScreen(val route: String) {
         fun createRoute(cardNumber: String = "PANU-FND-001"): String =
             "verify/${cardNumber.ifBlank { "PANU-FND-001" }}"
     }
+    data object Chat : PanuScreen("chat")
 }

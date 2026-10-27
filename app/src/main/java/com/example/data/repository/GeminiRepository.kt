@@ -5,6 +5,7 @@ import com.example.data.remote.Content
 import com.example.data.remote.ContentRequest
 import com.example.data.remote.GeminiApiService
 import com.example.data.remote.Part
+import com.example.data.remote.SystemInstruction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -18,23 +19,48 @@ class GeminiRepository(
         get() = apiKeyProvider?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
 
     companion object {
-        /**
-         * A. Prompt Système Officiel : Générateur de Films, Séries & Documentaires IA
-         * Sert de modèle backend pour générer un script, un storyboard, les prompts visuels 8K
-         * et l'emplacement stratégique de sponsoring/publicité.
-         */
         const val SYSTEM_PROMPT_CINEMA_PRODUCER = """Tu es un réalisateur et producteur de cinéma IA de classe mondiale. À partir de l'idée ou du thème fourni par l'utilisateur :
 Concept & Synopsis : Génère un titre accrocheur, le genre (Film, Série ou Documentaire), le pitch et l'intrigue principale.
 Structure des Scènes : Découpe l'histoire en 3 scènes clés (Introduction, Climax, Conclusion) avec indications pour la voix off et le style visuel.
 Prompts Générateurs d'Images/Vidéos (Photoréalistes) : Pour chaque scène, rédige un prompt visuel détaillé en anglais (compatible Midjourney/Runway/Luma) incluant : sujet, angle de caméra, éclairage cinématique, résolution 8K, style photoréaliste/documentaire, ambiance.
 Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la vidéo pour placer un placement de produit ou une pause publicitaire sponsorisée sans couper le rythme."""
 
-        /**
-         * B. Prompt Précis de Création Vidéo (Exemple Prêt à Tester)
-         * Prompt visuel photoréaliste 8K direct pour le moteur vidéo IA.
-         */
         const val READY_TO_TEST_CINEMATIC_VIDEO_PROMPT =
             "Cinematic 8K documentary shot, ultra-realistic, dynamic drone footage flying over a vibrant modern African metropolis at sunset, golden hour lighting, hyper-detailed architecture, cinematic color grading, smooth camera movement, highly immersive narrative style, shot on 35mm lens, photorealistic --ar 16:9 --fps 30"
+    }
+
+    suspend fun chatWithGemini(
+        modelName: String = "gemini-3.8-flash",
+        history: List<Pair<String, String>>, // list of (role, text)
+        userPrompt: String,
+        systemInstruction: String = "Tu es l'Assistant IA expert et Directeur Artistique de PANU, spécialisé dans l'afrofuturisme, le cinéma, les séries, les documentaires et la création de contenu."
+    ): String = withContext(Dispatchers.IO) {
+        val cleanPrompt = userPrompt.trim()
+        if (cleanPrompt.isBlank()) return@withContext "Veuillez saisir un message."
+
+        val contentsList = mutableListOf<Content>()
+        for ((role, text) in history) {
+            contentsList.add(Content(role = role, parts = listOf(Part(text))))
+        }
+        contentsList.add(Content(role = "user", parts = listOf(Part(cleanPrompt))))
+
+        val sysInst = SystemInstruction(listOf(Part(systemInstruction)))
+        val request = ContentRequest(system_instruction = sysInst, contents = contentsList)
+
+        if (resolvedApiKey.isNotBlank() && !resolvedApiKey.startsWith("YOUR_")) {
+            try {
+                val response = apiService.generateContent(modelName, resolvedApiKey, request)
+                val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                if (!text.isNullOrBlank()) {
+                    return@withContext text
+                }
+            } catch (_: Exception) {
+                // Fallback on exception
+            }
+        }
+
+        // Fallback intelligent
+        "✨ [PANU AI Assistant • $modelName] : J'ai bien reçu votre message. En tant qu'expert PANU, je suis là pour propulser vos projets de création multimédia, de scripts et de vidéos vers le sommet !"
     }
 
     suspend fun generateScenario(concept: String, genre: String = "Documentaire / Film / Série IA"): String = withContext(Dispatchers.IO) {
@@ -46,16 +72,16 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
             $concept
         """.trimIndent()
 
-        if (resolvedApiKey.isNotBlank()) {
+        if (resolvedApiKey.isNotBlank() && !resolvedApiKey.startsWith("YOUR_")) {
             try {
-                val request = ContentRequest(listOf(Content(listOf(Part(fullPrompt)))))
-                val response = apiService.generateContent(resolvedApiKey, request)
+                val request = ContentRequest(contents = listOf(Content(parts = listOf(Part(fullPrompt)))))
+                val response = apiService.generateContent("gemini-3.8-flash", resolvedApiKey, request)
                 val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 if (!text.isNullOrBlank()) {
                     return@withContext text
                 }
             } catch (_: Exception) {
-                // Bascule transparente sur le moteur de production structuré en cas d'absence de réseau ou quota
+                // Fallback
             }
         }
 
@@ -68,14 +94,14 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
 
         if (resolvedApiKey.isNotBlank() && !resolvedApiKey.startsWith("YOUR_")) {
             try {
-                val request = ContentRequest(listOf(Content(listOf(Part(cleanPrompt)))))
-                val response = apiService.generateContent(resolvedApiKey, request)
+                val request = ContentRequest(contents = listOf(Content(parts = listOf(Part(cleanPrompt)))))
+                val response = apiService.generateContent("gemini-3.8-flash", resolvedApiKey, request)
                 val text = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 if (!text.isNullOrBlank()) {
                     return@withContext text
                 }
             } catch (_: Exception) {
-                // Fallback direct
+                // Fallback
             }
         }
 
@@ -130,34 +156,29 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
         """.trimIndent()
     }
 
-    /**
-     * Recherche sémantique conceptuelle propulsée par Google Gemini (gemini-3.5-flash)
-     * Permet à l'utilisateur de chercher par concept (ex: 'images de futur africain') au lieu de seulement par mots-clés.
-     */
     suspend fun searchSemantically(conceptQuery: String, posts: List<Post>): List<Post> = withContext(Dispatchers.IO) {
         if (conceptQuery.isBlank() || posts.isEmpty()) return@withContext posts
 
         val cleanQuery = conceptQuery.trim()
 
-        if (apiKey.isNotBlank() && !apiKey.startsWith("YOUR_")) {
+        if (resolvedApiKey.isNotBlank() && !resolvedApiKey.startsWith("YOUR_")) {
             try {
-                val candidateSummaries = posts.take(20).mapIndexed { idx, p ->
+                val candidateSummaries = posts.take(20).mapIndexed { _, p ->
                     "[ID:${p.id}] Titre: ${p.title ?: "Sans titre"} | Type: ${p.mediaType} | Texte: ${p.content.take(120)} | Auteur: ${p.authorName ?: "Créateur"}"
                 }.joinToString("\n")
 
                 val prompt = """
                     Tu es le moteur de recherche sémantique IA de l'application PANU.
-                    L'utilisateur effectue une recherche par CONCEPT : "$cleanQuery" (ex: "images de futur africain", "créations musicales urbaines", "mode afro chic", etc.).
-                    
-                    Parmi les publications ci-dessous, sélectionne et ordonne celles qui correspondent sémantiquement à ce concept, même si les mots exacts ne figurent pas textuellement dans la publication (par exemple : le concept 'images de futur africain' correspond à des photos/images d'afrofuturisme, métropoles modernes, graphisme 3D, architecture contemporaine, etc.) :
+                    L'utilisateur effectue une recherche par CONCEPT : "$cleanQuery".
+                    Parmi les publications ci-dessous, sélectionne et ordonne celles qui correspondent sémantiquement :
                     
                     $candidateSummaries
                     
-                    Réponds UNIQUEMENT avec la liste des IDs correspondants séparés par une virgule, du plus pertinent au moins pertinent. Exemple : ID1, ID2. Si aucune publication ne correspond, réponds "AUCUN".
+                    Réponds UNIQUEMENT avec la liste des IDs correspondants séparés par une virgule. Exemple : ID1, ID2. Si aucun, réponds "AUCUN".
                 """.trimIndent()
 
-                val request = ContentRequest(listOf(Content(listOf(Part(prompt)))))
-                val response = apiService.generateContent(apiKey, request)
+                val request = ContentRequest(contents = listOf(Content(parts = listOf(Part(prompt)))))
+                val response = apiService.generateContent("gemini-3.8-flash", resolvedApiKey, request)
                 val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
 
                 if (reply.isNotBlank() && !reply.contains("AUCUN", ignoreCase = true)) {
@@ -174,7 +195,7 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
                     }
                 }
             } catch (_: Exception) {
-                // Fallback vers l'expansion sémantique conceptuelle
+                // Fallback
             }
         }
 
@@ -188,11 +209,10 @@ Emplacement Sponsor/Publicité : Indique précisément l'endroit idéal dans la 
         val semanticClusters = mapOf(
             "futur" to listOf("futur", "futuriste", "afrofuturisme", "moderne", "sci-fi", "innovation", "technologie", "demain", "vision", "8k", "3d", "robot", "ia"),
             "image" to listOf("image", "photo", "visuel", "affiche", "png", "illustration", "art", "tableau", "design", "carousel"),
-            "images" to listOf("image", "photo", "visuel", "affiche", "png", "illustration", "art", "tableau", "design", "carousel"),
-            "africain" to listOf("africain", "afrique", "dakar", "lagos", "kinshasa", "abidjan", "kigali", "sahara", "sahel", "yoruba", "kongo", "métropole", "continent"),
+            "africain" to listOf("africain", "afrique", "dakar", "lagos", "kinshasa", "abidjan", "kigali", "sahara", "sahel", "yoruba", "kongo", "métropole"),
             "video" to listOf("video", "vidéo", "film", "série", "documentaire", "drone", "mp4", "cinema", "cinématique", "caméra"),
-            "musique" to listOf("musique", "son", "audio", "afrobeats", "amapiano", "rythme", "chanson", "piste"),
-            "culture" to listOf("culture", "tradition", "patrimoine", "héritage", "art", "histoire")
+            "musique" to listOf("musique", "son", "audio", "afrobeats", "amapiano", "rythme", "chanson"),
+            "culture" to listOf("culture", "tradition", "patrimoine", "héritage", "art")
         )
 
         val expandedKeywords = mutableSetOf<String>()

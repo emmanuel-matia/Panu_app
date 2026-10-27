@@ -15,6 +15,7 @@ import com.example.ui.screens.activity.ActivityScreen
 import com.example.ui.screens.auth.ForgotPasswordScreen
 import com.example.ui.screens.auth.LoginScreen
 import com.example.ui.screens.auth.RegisterScreen
+import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.create.CreatePostScreen
 import com.example.ui.screens.founder.FounderDashboardScreen
 import com.example.ui.screens.home.HomeScreen
@@ -27,6 +28,7 @@ import com.example.ui.screens.studio.StudioScreen
 import com.example.ui.screens.verify.VerifyMemberCardScreen
 import com.example.ui.screens.vod.VideoPlayerScreen
 import com.example.ui.theme.PanuTheme
+import com.example.ui.viewmodel.ChatViewModel
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -136,6 +138,9 @@ fun PanuAppNavHost(container: PanuAppContainer) {
             route == "settings" || route == PanuScreen.Settings.route -> {
                 currentRoute = PanuScreen.Settings.route
             }
+            route == "chat" || route == PanuScreen.Chat.route -> {
+                currentRoute = PanuScreen.Chat.route
+            }
             else -> {
                 currentRoute = route
             }
@@ -162,6 +167,14 @@ fun PanuAppNavHost(container: PanuAppContainer) {
                 isFounder = isFounder,
                 onNavigate = ::navigateTo,
                 onNavigateBack = { currentRoute = PanuScreen.Home.route }
+            )
+        }
+        currentRoute == PanuScreen.Chat.route -> {
+            val chatViewModel = remember { ChatViewModel(container.geminiRepository) }
+            ChatScreen(
+                chatViewModel = chatViewModel,
+                isFounder = isFounder,
+                onNavigate = ::navigateTo
             )
         }
         currentRoute == PanuScreen.Create.route -> {
